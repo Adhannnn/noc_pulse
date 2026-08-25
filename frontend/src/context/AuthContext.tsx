@@ -22,7 +22,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+function getApiBase() {
+  if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:4000`;
+  }
+  return 'http://localhost:4000';
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -74,7 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
-    const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+    const baseUrl = getApiBase();
+    const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
     const headers = new Headers(options.headers || {});
     
     if (token) {
