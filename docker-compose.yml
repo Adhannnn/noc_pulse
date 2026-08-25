@@ -8,10 +8,10 @@ services:
     container_name: pulsenoc-backend
     restart: always
     ports:
-      - "3001:3001"
+      - "4000:4000"
     environment:
       NODE_ENV: production
-      PORT: 3001
+      PORT: 4000
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres123@host.docker.internal:5432/pulse_noc?schema=public}
       JWT_SECRET: ${JWT_SECRET:-super-secret-pulsenoc-jwt-key-2026}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
@@ -27,11 +27,11 @@ services:
     container_name: pulsenoc-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "3002:3002"
     environment:
       NODE_ENV: production
-      PORT: 3000
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_WS_URL: http://localhost:3001
+      PORT: 3002
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_WS_URL: http://localhost:4000
     depends_on:
       - backend
