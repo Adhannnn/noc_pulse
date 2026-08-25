@@ -21,7 +21,49 @@ export class MetricsService {
     await this.collectAndBroadcastMetrics();
   }
 
+  private getLinuxMemInfo() {
+    try {
+      if (fs.existsSync('/proc/meminfo')) {
+        const content = fs.readFileSync('/proc/meminfo', 'utf-8');
+        const lines = content.split('\n');
+        let memTotalKb = 0;
+        let memAvailableKb = 0;
+        let memFreeKb = 0;
+        let buffersKb = 0;
+        let cachedKb = 0;
+
+        lines.forEach((line) => {
+          const parts = line.split(':');
+          if (parts.length === 2) {
+            const key = parts[0].trim();
+            const val = parseInt(parts[1].trim().split(/\s+/)[0], 10);
+            if (key === 'MemTotal') memTotalKb = val;
+            if (key === 'MemAvailable') memAvailableKb = val;
+            if (key === 'MemFree') memFreeKb = val;
+            if (key === 'Buffers') buffersKb = val;
+            if (key === 'Cached') cachedKb = val;
+          }
+        });
+
+        if (memTotalKb > 0) {
+          const availableKb = memAvailableKb || (memFreeKb + buffersKb + cachedKb);
+          const usedKb = memTotalKb - availableKb;
+          return {
+            ramUsedMb: Number((usedKb / 1024).toFixed(2)),
+            ramTotalMb: Number((memTotalKb / 1024).toFixed(2)),
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   private getMemoryStats(mem: si.Systeminformation.MemData) {
+    const directProc = this.getLinuxMemInfo();
+    if (directProc) {
+      return directProc;
+    }
+
     let totalBytes = mem.total;
 
     // Check if container cgroup memory limit exists
@@ -62,7 +104,11 @@ export class MetricsService {
         si.networkStats(),
     ]);
 
-      const disk = fsSize.find((f) => f.mount === '/') || fsSize[0] || { use: 0 };
+      const disk =
+        fsSize.find((f) => f.fs && (f.fs.includes('/dev/sd') || f.fs.includes('/dev/nvme') || f.fs.includes('/dev/mapper'))) ||
+        fsSize.find((f) => f.mount === '/') ||
+        fsSize[0] ||
+        { use: 0 };
       const net = netStats[0] || { rx_sec: 0, tx_sec: 0 };
       const { ramUsedMb, ramTotalMb } = this.getMemoryStats(mem);
 
