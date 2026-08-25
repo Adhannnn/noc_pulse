@@ -18,6 +18,8 @@ export class MetricsService {
 
   async onApplicationBootstrap() {
     this.logger.log('Executing initial host metrics collection...');
+    // Purge old stale metric history from database to ensure fresh host RAM is displayed
+    await this.prisma.hostMetric.deleteMany({}).catch(() => {});
     await this.collectAndBroadcastMetrics();
   }
 
@@ -135,6 +137,7 @@ export class MetricsService {
 
       // 2. Broadcast secara Realtime ke Dashboard Frontend via WebSocket
       this.eventsGateway.broadcastHostMetrics(metricsData);
+      this.logger.debug(`Host Metrics: RAM ${ramUsedMb}MB / ${ramTotalMb}MB | Disk ${disk.use}%`);
     } catch (error) {
       this.logger.error('Failed to collect host metrics', error);
     }
