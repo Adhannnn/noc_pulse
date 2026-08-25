@@ -23,8 +23,14 @@ export class MetricsService {
 
   private getLinuxMemInfo() {
     try {
-      if (fs.existsSync('/proc/meminfo')) {
-        const content = fs.readFileSync('/proc/meminfo', 'utf-8');
+      const targetPath = fs.existsSync('/host/proc/meminfo')
+        ? '/host/proc/meminfo'
+        : fs.existsSync('/proc/meminfo')
+        ? '/proc/meminfo'
+        : null;
+
+      if (targetPath) {
+        const content = fs.readFileSync(targetPath, 'utf-8');
         const lines = content.split('\n');
         let memTotalKb = 0;
         let memAvailableKb = 0;
@@ -162,13 +168,22 @@ export class MetricsService {
         ? netInterfaces.find((i) => !i.internal && i.ip4) || netInterfaces[0]
         : { ip4: '192.168.203.151', iface: 'enp0s3' };
 
+      let realHostname = osInfo.hostname || 'dashboard';
+      try {
+        if (fs.existsSync('/host/proc/sys/kernel/hostname')) {
+          realHostname = fs.readFileSync('/host/proc/sys/kernel/hostname', 'utf-8').trim();
+        } else if (fs.existsSync('/proc/sys/kernel/hostname')) {
+          realHostname = fs.readFileSync('/proc/sys/kernel/hostname', 'utf-8').trim();
+        }
+      } catch (_) {}
+
       return {
-        hostname: osInfo.hostname || 'dashboard',
-        os: `${osInfo.distro || 'Debian GNU/Linux'} ${osInfo.release || '13 (trixie)'}`,
-        kernel: osInfo.kernel || '6.12.48+deb13-cloud-amd64',
+        hostname: realHostname,
+        os: `${osInfo.distro || 'Debian GNU/Linux'} ${osInfo.release || '12'}`,
+        kernel: osInfo.kernel || 'Linux',
         uptime: formattedUptime,
-        cpuCores: `${cpu.cores || 4} cores`,
-        ipAddress: `${primaryInterface.ip4 || '192.168.203.151'} (${primaryInterface.iface || 'enp0s3'})`,
+        cpuCores: `${cpu.cores || 2} cores`,
+        ipAddress: `${primaryInterface.ip4 || '192.168.1.10'} (${primaryInterface.iface || 'eth0'})`,
       };
     } catch (error) {
       return {
