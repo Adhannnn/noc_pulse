@@ -23,15 +23,43 @@ export class MetricsService {
     await this.collectAndBroadcastMetrics();
   }
 
-  private getLinuxMemInfo() {
-    try {
-      const targetPath = fs.existsSync('/host/proc/meminfo')
-        ? '/host/proc/meminfo'
-        : fs.existsSync('/proc/meminfo')
-        ? '/proc/meminfo'
-        : null;
+  private getCgroupMemoryLimit(): number | null {
+    const paths = [
+      '/host/sys/fs/cgroup/memory.max',
+      '/sys/fs/cgroup/memory.max',
+      '/host/sys/fs/cgroup/memory/memory.limit_in_bytes',
+      '/sys/fs/cgroup/memory/memory.limit_in_bytes',
+    ];
 
-      if (targetPath) {
+    for (const p of paths) {
+      try {
+        if (fs.existsSync(p)) {
+          const valStr = fs.readFileSync(p, 'utf-8').trim();
+          if (valStr && valStr !== 'max') {
+            const bytes = parseInt(valStr, 10);
+            if (bytes > 0 && bytes < 1099511627776) {
+              return bytes;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  private getMemoryStats(mem: si.Systeminformation.MemData) {
+    let totalBytes = mem.total;
+    let usedBytes = mem.active || (mem.total - mem.available) || mem.used;
+
+    // 1. Read /proc/meminfo
+    const targetPath = fs.existsSync('/host/proc/meminfo')
+      ? '/host/proc/meminfo'
+      : fs.existsSync('/proc/meminfo')
+      ? '/proc/meminfo'
+      : null;
+
+    if (targetPath) {
+      try {
         const content = fs.readFileSync(targetPath, 'utf-8');
         const lines = content.split('\n');
         let memTotalKb = 0;
@@ -54,45 +82,29 @@ export class MetricsService {
         });
 
         if (memTotalKb > 0) {
+          totalBytes = memTotalKb * 1024;
           const availableKb = memAvailableKb || (memFreeKb + buffersKb + cachedKb);
-          const usedKb = memTotalKb - availableKb;
-          return {
-            ramUsedMb: Number((usedKb / 1024).toFixed(2)),
-            ramTotalMb: Number((memTotalKb / 1024).toFixed(2)),
-          };
+          usedBytes = (memTotalKb - availableKb) * 1024;
         }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  private getMemoryStats(mem: si.Systeminformation.MemData) {
-    const directProc = this.getLinuxMemInfo();
-    if (directProc) {
-      return directProc;
+      } catch (_) {}
     }
 
-    let totalBytes = mem.total;
+    // 2. Apply cgroup RAM limit if set
+    const cgroupLimitBytes = this.getCgroupMemoryLimit();
+    if (cgroupLimitBytes && cgroupLimitBytes < totalBytes) {
+      totalBytes = cgroupLimitBytes;
+    }
 
-    // Check if container cgroup memory limit exists
-    try {
-      if (fs.existsSync('/sys/fs/cgroup/memory.max')) {
-        const valStr = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf-8').trim();
-        if (valStr !== 'max') {
-          const val = parseInt(valStr, 10);
-          if (val > 0 && val < totalBytes) totalBytes = val;
-        }
-      } else if (fs.existsSync('/sys/fs/cgroup/memory/memory.limit_in_bytes')) {
-        const valStr = fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf-8').trim();
-        const val = parseInt(valStr, 10);
-        if (val > 0 && val < totalBytes && val < 9223372036854770000) totalBytes = val;
+    // 3. Apply HOST_TOTAL_RAM_GB override if specified
+    if (process.env.HOST_TOTAL_RAM_GB) {
+      const envRamGb = parseFloat(process.env.HOST_TOTAL_RAM_GB);
+      if (!isNaN(envRamGb) && envRamGb > 0) {
+        totalBytes = envRamGb * 1024 * 1024 * 1024;
       }
-    } catch (_) {}
+    }
 
-    // Active RAM used by applications (excluding Linux OS page cache / buffers)
-    let usedBytes = mem.active || (mem.total - mem.available) || (mem.used - (mem.buffers || 0) - (mem.cached || 0));
-    if (usedBytes <= 0 || usedBytes > totalBytes) {
-      usedBytes = mem.active || (mem.total - mem.available) || Math.round(totalBytes * 0.25);
+    if (usedBytes > totalBytes) {
+      usedBytes = Math.round(totalBytes * 0.5);
     }
 
     return {
