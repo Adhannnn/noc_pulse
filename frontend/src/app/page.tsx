@@ -248,9 +248,9 @@ export default function DashboardPage() {
     ? Math.round(monitors.reduce((acc, m) => acc + (m.heartbeats[0]?.latencyMs || 0), 0) / (monitors.length || 1))
     : 0;
 
-  const ramUsedGb = hostMetrics ? (hostMetrics.ramUsedMb / 1024).toFixed(1) : '3.1';
-  const ramTotalGb = hostMetrics ? (hostMetrics.ramTotalMb / 1024).toFixed(1) : '3.8';
-  const ramPct = hostMetrics ? Math.round((hostMetrics.ramUsedMb / hostMetrics.ramTotalMb) * 100) : 81;
+  const ramUsedGb = hostMetrics ? (hostMetrics.ramUsedMb / 1024).toFixed(1) : '0.8';
+  const ramTotalGb = hostMetrics ? (hostMetrics.ramTotalMb / 1024).toFixed(1) : '4.0';
+  const ramPct = hostMetrics && hostMetrics.ramTotalMb > 0 ? Math.round((hostMetrics.ramUsedMb / hostMetrics.ramTotalMb) * 100) : 20;
   const diskPct = hostMetrics ? Math.round(hostMetrics.diskUsagePct) : 14;
 
   const handleSelectTab = (tab: NOCNavSection) => {

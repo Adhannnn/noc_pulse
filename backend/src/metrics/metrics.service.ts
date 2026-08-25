@@ -5,6 +5,8 @@ import * as si from 'systeminformation';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 
+import * as fs from 'fs';
+
 @Injectable()
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
@@ -19,6 +21,36 @@ export class MetricsService {
     await this.collectAndBroadcastMetrics();
   }
 
+  private getMemoryStats(mem: si.Systeminformation.MemData) {
+    let totalBytes = mem.total;
+
+    // Check if container cgroup memory limit exists
+    try {
+      if (fs.existsSync('/sys/fs/cgroup/memory.max')) {
+        const valStr = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf-8').trim();
+        if (valStr !== 'max') {
+          const val = parseInt(valStr, 10);
+          if (val > 0 && val < totalBytes) totalBytes = val;
+        }
+      } else if (fs.existsSync('/sys/fs/cgroup/memory/memory.limit_in_bytes')) {
+        const valStr = fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf-8').trim();
+        const val = parseInt(valStr, 10);
+        if (val > 0 && val < totalBytes && val < 9223372036854770000) totalBytes = val;
+      }
+    } catch (_) {}
+
+    // Active RAM used by applications (excluding Linux OS page cache / buffers)
+    let usedBytes = mem.active || (mem.total - mem.available) || (mem.used - (mem.buffers || 0) - (mem.cached || 0));
+    if (usedBytes <= 0 || usedBytes > totalBytes) {
+      usedBytes = mem.active || (mem.total - mem.available) || Math.round(totalBytes * 0.25);
+    }
+
+    return {
+      ramUsedMb: Number((usedBytes / 1024 / 1024).toFixed(2)),
+      ramTotalMb: Number((totalBytes / 1024 / 1024).toFixed(2)),
+    };
+  }
+
   // Cron job setiap 5 detik: Mengumpulkan stats & broadcast via WebSocket
   @Cron('*/5 * * * * *')
   async collectAndBroadcastMetrics() {
@@ -30,13 +62,14 @@ export class MetricsService {
         si.networkStats(),
     ]);
 
-      const disk = fsSize[0] || { use: 0 };
+      const disk = fsSize.find((f) => f.mount === '/') || fsSize[0] || { use: 0 };
       const net = netStats[0] || { rx_sec: 0, tx_sec: 0 };
+      const { ramUsedMb, ramTotalMb } = this.getMemoryStats(mem);
 
       const metricsData = {
         cpuUsage: Number(cpu.currentLoad.toFixed(2)),
-        ramUsedMb: Number((mem.used / 1024 / 1024).toFixed(2)),
-        ramTotalMb: Number((mem.total / 1024 / 1024).toFixed(2)),
+        ramUsedMb,
+        ramTotalMb,
         diskUsagePct: Number(disk.use.toFixed(2)),
         networkInKb: Number(((net.rx_sec || 0) / 1024).toFixed(2)),
         networkOutKb: Number(((net.tx_sec || 0) / 1024).toFixed(2)),
