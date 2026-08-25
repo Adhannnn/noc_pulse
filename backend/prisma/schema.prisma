@@ -1,0 +1,234 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// Enums
+// ----------------------------------------------------
+enum MonitorType {
+  HTTP
+  TCP
+  PING
+  DATABASE
+}
+
+enum MonitorStatus {
+  UP
+  DEGRADED
+  DOWN
+  PENDING
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+enum IncidentSeverity {
+  CRITICAL
+  MAJOR
+  MINOR
+  MAINTENANCE
+}
+
+enum AlertChannelType {
+  TELEGRAM
+  DISCORD
+  SLACK
+  WEBHOOK
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+}
+
+// ----------------------------------------------------
+// Models
+// ----------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(OPERATOR)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model DataCenter {
+  id          String    @id @default(cuid())
+  name        String
+  location    String?
+  description String?
+  monitors    Monitor[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("datacenters")
+}
+
+model Monitor {
+  id              String         @id @default(cuid())
+  name            String
+  type            MonitorType    @default(HTTP)
+  url             String?        // Target URL atau Host IP
+  port            Int?           // Untuk TCP / DB probe
+  group           String?        @default("Home DC")
+  intervalSec     Int            @default(60) // Frekuensi probing dalam detik
+  timeoutSec      Int            @default(10) // Ambang batas timeout
+  isActive        Boolean        @default(true)
+  currentStatus   MonitorStatus  @default(PENDING)
+  uptimePercent24h Float         @default(100.0)
+  lastProbedAt    DateTime?
+
+  dataCenterId    String?
+  dataCenter      DataCenter?    @relation(fields: [dataCenterId], references: [id], onDelete: SetNull)
+
+  // Relasi
+  heartbeats      Heartbeat[]
+  incidents       Incident[]
+  alertChannels   AlertChannel[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("monitors")
+}
+
+model ServiceGroup {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("service_groups")
+}
+
+model Heartbeat {
+  id          String        @id @default(cuid())
+  monitorId   String
+  monitor     Monitor       @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status      MonitorStatus
+  latencyMs   Int           // Waktu respons dalam milidetik
+  statusCode  Int?          // HTTP status code (200, 404, 502, dst)
+  errorMessage String?      // Pesan error jika DOWN
+  timestamp   DateTime      @default(now())
+
+  // Indexing untuk query time-series agregasi latency & status history
+  @@index([monitorId, timestamp(sort: Desc)])
+  @@map("heartbeats")
+}
+
+model Incident {
+  id          String           @id @default(cuid())
+  monitorId   String
+  monitor     Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  severity    IncidentSeverity @default(CRITICAL)
+  status      IncidentStatus   @default(INVESTIGATING)
+  startedAt   DateTime         @default(now())
+  resolvedAt  DateTime?
+
+  updates     IncidentUpdate[]
+
+  @@index([monitorId, status])
+  @@map("incidents")
+}
+
+model IncidentUpdate {
+  id          String         @id @default(cuid())
+  incidentId  String
+  incident    Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  status      IncidentStatus
+  message     String
+  createdAt   DateTime       @default(now())
+
+  @@map("incident_updates")
+}
+
+model AlertChannel {
+  id          String           @id @default(cuid())
+  name        String
+  type        AlertChannelType
+  webhookUrl  String?
+  chatId      String?          // Khusus Telegram chat_id
+  botToken    String?          // Custom bot token (opsional)
+  isEnabled   Boolean          @default(true)
+
+  // Relasi many-to-many dengan monitor
+  monitors    Monitor[]
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("alert_channels")
+}
+
+model HostMetric {
+  id          String   @id @default(cuid())
+  cpuUsage    Float    // Persentase CPU (0 - 100)
+  ramUsedMb   Float    // RAM terpakai (MB)
+  ramTotalMb  Float    // Total RAM (MB)
+  diskUsagePct Float   // Disk terpakai (%)
+  networkInKb Float    // Network Rx (KB/s)
+  networkOutKb Float   // Network Tx (KB/s)
+  timestamp   DateTime @default(now())
+
+  @@index([timestamp(sort: Desc)])
+  @@map("host_metrics")
+}
+
+model IpAddress {
+  id          String   @id @default(cuid())
+  ip          String   @unique
+  subnet      String   @default("192.168.1.0/24")
+  hostname    String?
+  status      String   @default("ACTIVE")
+  assignedTo  String?
+  lastPingMs  Int?     @default(5)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ip_addresses")
+}
+
+model BackupRecord {
+  id          String   @id @default(cuid())
+  deviceName  String
+  filename    String
+  sizeKb      Int
+  status      String   @default("SUCCESS")
+  createdAt   DateTime @default(now())
+
+  @@map("backup_records")
+}
+
+model DatabaseConnection {
+  id          String   @id @default(cuid())
+  name        String
+  engine      String   @default("PostgreSQL")
+  host        String
+  port        Int      @default(5432)
+  database    String   @default("postgres")
+  username    String   @default("postgres")
+  password    String?
+  status      String   @default("ONLINE")
+  latencyMs   Int      @default(3)
+  connections Int      @default(12)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("database_connections")
+}
