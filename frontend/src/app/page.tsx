@@ -35,13 +35,18 @@ import {
   FolderPlus,
 } from 'lucide-react';
 
+// diskReadKb/diskWriteKb opsional — hanya terisi kalau backend sudah kirim (lihat opsi 2 di bawah)
 interface HostMetric {
   cpuUsage: number;
   ramUsedMb: number;
   ramTotalMb: number;
   diskUsagePct: number;
+  diskUsedGb?: number;
+  diskTotalGb?: number;
   networkInKb: number;
   networkOutKb: number;
+  diskReadKb?: number;
+  diskWriteKb?: number;
 }
 
 export default function DashboardPage() {
@@ -102,7 +107,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Dynamically group monitors by group field (including registered empty groups)
   const groupedMonitors = (() => {
     const acc: Record<string, Monitor[]> = {};
     registeredGroups.forEach((g) => {
@@ -119,12 +123,13 @@ export default function DashboardPage() {
     return acc;
   })();
 
-  // Telemetry Sparkline Buffers
-  const [cpuHistory, setCpuHistory] = useState<number[]>([12, 18, 15, 24, 14, 28, 19, 12, 22, 14, 18, 12.4]);
-  const [netRxHistory, setNetRxHistory] = useState<number[]>([40, 80, 50, 120, 90, 150, 110, 143.2]);
-  const [netTxHistory, setNetTxHistory] = useState<number[]>([10, 25, 15, 45, 20, 35, 28, 32.6]);
-  const [diskReadHistory, setDiskReadHistory] = useState<number[]>([0, 0, 0, 10, 0, 0, 0, 0]);
-  const [diskWriteHistory, setDiskWriteHistory] = useState<number[]>([2, 5, 3, 40, 12, 6, 8, 7.2]);
+  // Telemetry Sparkline Buffers — MULAI KOSONG, diisi hanya dari data real via socket/history.
+  // Jangan seed dengan angka ngarang; TelemetrySparkline harus bisa handle array kosong.
+  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
+  const [netRxHistory, setNetRxHistory] = useState<number[]>([]);
+  const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
+  const [diskReadHistory, setDiskReadHistory] = useState<number[]>([]);
+  const [diskWriteHistory, setDiskWriteHistory] = useState<number[]>([]);
 
   const { socket } = useSocket();
   const { user, authFetch } = useAuth();
@@ -155,11 +160,20 @@ export default function DashboardPage() {
 
   const fetchHostHistory = async () => {
     try {
-      const res = await authFetch('/api/metrics/history?limit=1');
+      // ambil lebih dari 1 biar sparkline langsung ada bentuk saat pertama load,
+      // bukan cuma 1 titik data
+      const res = await authFetch('/api/metrics/history?limit=16');
       if (res.ok) {
-        const data = await res.json();
+        const data: HostMetric[] = await res.json();
         if (data && data.length > 0) {
-          setHostMetrics(data[0]);
+          // API mengembalikan urutan terbaru dulu (desc) -> balik agar kronologis
+          const chronological = [...data].reverse();
+          setHostMetrics(chronological[chronological.length - 1]);
+          setCpuHistory(chronological.map((d) => d.cpuUsage));
+          setNetRxHistory(chronological.map((d) => d.networkInKb));
+          setNetTxHistory(chronological.map((d) => d.networkOutKb));
+          setDiskReadHistory(chronological.map((d) => d.diskReadKb ?? 0));
+          setDiskWriteHistory(chronological.map((d) => d.diskWriteKb ?? 0));
         }
       }
     } catch (err) {
@@ -183,7 +197,10 @@ export default function DashboardPage() {
       setCpuHistory((prev) => [...prev.slice(-15), data.cpuUsage]);
       setNetRxHistory((prev) => [...prev.slice(-15), data.networkInKb]);
       setNetTxHistory((prev) => [...prev.slice(-15), data.networkOutKb]);
-      setDiskWriteHistory((prev) => [...prev.slice(-15), data.diskUsagePct]);
+      // Disk I/O history: hanya diisi kalau backend memang mengirim field ini.
+      // Kalau tidak ada, dorong 0 (bukan diskUsagePct, itu metrik beda).
+      setDiskReadHistory((prev) => [...prev.slice(-15), data.diskReadKb ?? 0]);
+      setDiskWriteHistory((prev) => [...prev.slice(-15), data.diskWriteKb ?? 0]);
     });
 
     socket.on('monitors:heartbeat', (data) => {
@@ -240,7 +257,6 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  // Metric Computations
   const totalServices = monitors.length;
   const onlineServices = monitors.filter((m) => m.currentStatus === 'UP').length;
   const offlineServices = monitors.filter((m) => m.currentStatus === 'DOWN').length;
@@ -248,16 +264,32 @@ export default function DashboardPage() {
     ? Math.round(monitors.reduce((acc, m) => acc + (m.heartbeats[0]?.latencyMs || 0), 0) / (monitors.length || 1))
     : 0;
 
-  const ramUsedGb = hostMetrics ? (hostMetrics.ramUsedMb / 1024).toFixed(1) : '0.8';
-  const ramTotalGb = hostMetrics ? (hostMetrics.ramTotalMb / 1024).toFixed(1) : '4.0';
-  const ramPct = hostMetrics && hostMetrics.ramTotalMb > 0 ? Math.round((hostMetrics.ramUsedMb / hostMetrics.ramTotalMb) * 100) : 20;
-  const diskPct = hostMetrics ? Math.round(hostMetrics.diskUsagePct) : 54;
-  const diskUsedGb = hostMetrics && (hostMetrics as any).diskUsedGb !== undefined
-    ? Number((hostMetrics as any).diskUsedGb).toFixed(1)
-    : hostMetrics ? ((hostMetrics.diskUsagePct / 100) * 106).toFixed(1) : '57.2';
-  const diskTotalGb = hostMetrics && (hostMetrics as any).diskTotalGb !== undefined
-    ? Number((hostMetrics as any).diskTotalGb).toFixed(1)
-    : '106.0';
+  // Semua nilai di bawah ini "—" kalau hostMetrics belum ada, BUKAN "0.0" —
+  // supaya jelas bedanya "belum ada data" vs "memang 0".
+  const hasMetrics = !!hostMetrics;
+  const ramUsedGb = hasMetrics ? (hostMetrics!.ramUsedMb / 1024).toFixed(1) : '—';
+  const ramTotalGb = hasMetrics ? (hostMetrics!.ramTotalMb / 1024).toFixed(1) : '—';
+  const ramPct = hasMetrics && hostMetrics!.ramTotalMb > 0
+    ? Math.round((hostMetrics!.ramUsedMb / hostMetrics!.ramTotalMb) * 100)
+    : 0;
+
+  const diskPct = hasMetrics ? Math.round(hostMetrics!.diskUsagePct) : 0;
+  const diskUsedGb = hasMetrics && hostMetrics!.diskUsedGb !== undefined
+    ? hostMetrics!.diskUsedGb.toFixed(1)
+    : '—';
+  const diskTotalGb = hasMetrics && hostMetrics!.diskTotalGb !== undefined
+    ? hostMetrics!.diskTotalGb.toFixed(1)
+    : '—';
+
+  const cpuDisplay = hasMetrics ? `${hostMetrics!.cpuUsage}%` : '—';
+  const netInDisplay = hasMetrics ? hostMetrics!.networkInKb.toFixed(1) : '—';
+  const netOutDisplay = hasMetrics ? hostMetrics!.networkOutKb.toFixed(1) : '—';
+
+  // Disk I/O: hanya tampil kalau backend benar-benar kirim field ini.
+  const hasDiskIO = hasMetrics && hostMetrics!.diskReadKb !== undefined && hostMetrics!.diskWriteKb !== undefined;
+  const diskIoBadge = hasDiskIO
+    ? `R: ${hostMetrics!.diskReadKb!.toFixed(1)} KB/s  W: ${hostMetrics!.diskWriteKb!.toFixed(1)} KB/s`
+    : 'Not tracked';
 
   const handleSelectTab = (tab: NOCNavSection) => {
     setCurrentTab(tab);
@@ -267,12 +299,9 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-[#0B0F19] text-slate-100 font-sans">
-      {/* Persistent Left Sidebar */}
       <Sidebar currentTab={currentTab} onSelectTab={handleSelectTab} />
 
-      {/* Main Operations Canvas */}
       <main className="flex-1 overflow-y-auto min-w-0 p-6 md:p-8 space-y-6">
-        {/* Top Header & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase">
@@ -293,7 +322,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Context-Aware Action Buttons */}
           <div className="flex items-center gap-3">
             {currentTab === 'SERVICES' && (
               <button
@@ -333,7 +361,6 @@ export default function DashboardPage() {
           <>
             {currentTab === 'OVERVIEW' && (
               <div className="space-y-6">
-                {/* Top 5 KPI Summary Row */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
                     <div>
@@ -406,7 +433,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Middle Section: Server Info + Memory Arc + Storage Arc */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
                   <div className="lg:col-span-4">
                     <ServerInfoCard />
@@ -429,19 +455,18 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Bottom Section: Sparkline Waveforms */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <TelemetrySparkline
                     title="CPU USAGE"
                     type="cpu"
-                    currentValue={`${hostMetrics ? hostMetrics.cpuUsage : 12.4}%`}
+                    currentValue={cpuDisplay}
                     data={cpuHistory}
                   />
 
                   <TelemetrySparkline
                     title="NETWORK I/O"
                     type="network"
-                    badgeLabel={`↓ ${hostMetrics ? hostMetrics.networkInKb : 143.2} KB/s  ↑ ${hostMetrics ? hostMetrics.networkOutKb : 32.6} KB/s`}
+                    badgeLabel={`↓ ${netInDisplay} KB/s  ↑ ${netOutDisplay} KB/s`}
                     legend1={{ label: 'RX', color: '#10B981' }}
                     legend2={{ label: 'TX', color: '#F59E0B' }}
                     data1={netRxHistory}
@@ -451,7 +476,7 @@ export default function DashboardPage() {
                   <TelemetrySparkline
                     title="DISK I/O"
                     type="disk"
-                    badgeLabel="R: 0 B/s  W: 7.2 MB/s"
+                    badgeLabel={diskIoBadge}
                     legend1={{ label: 'Read', color: '#F97316' }}
                     legend2={{ label: 'Write', color: '#EF4444' }}
                     data1={diskReadHistory}
@@ -459,7 +484,6 @@ export default function DashboardPage() {
                   />
                 </div>
 
-                {/* Dynamically Grouped Service Data Center Cards (Read-Only Monitoring) */}
                 {Object.keys(groupedMonitors).length === 0 ? (
                   <div className="bg-[#121829] border border-[#1E2640] rounded-2xl p-8 text-center text-slate-500 font-mono text-xs shadow-sm">
                     No custom services registered.
@@ -524,7 +548,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* SERVICES TAB */}
             {currentTab === 'SERVICES' && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
@@ -660,21 +683,15 @@ export default function DashboardPage() {
             )}
 
             {currentTab === 'DATABASES' && <DatabasesView key={dbKey} />}
-
             {currentTab === 'INCIDENTS' && <IncidentsView />}
-
             {currentTab === 'IPMANAGEMENT' && <IpManagementView />}
-
             {currentTab === 'MTBACKUP' && <MtBackupView />}
-
             {currentTab === 'ALERTS' && <AlertChannelsView />}
-
             {currentTab === 'USERS' && <UserManagement />}
           </>
         )}
       </main>
 
-      {/* Add Group Modal */}
       <AddGroupModal
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
@@ -684,7 +701,6 @@ export default function DashboardPage() {
         }}
       />
 
-      {/* Add Service Modal */}
       <AddMonitorModal
         isOpen={isServiceModalOpen}
         defaultGroup={targetGroupForNewService}
@@ -695,14 +711,12 @@ export default function DashboardPage() {
         onSuccess={fetchMonitors}
       />
 
-      {/* Add Database Connection Modal */}
       <AddDatabaseModal
         isOpen={isDbModalOpen}
         onClose={() => setIsDbModalOpen(false)}
         onSuccess={() => setDbKey((prev) => prev + 1)}
       />
 
-      {/* Custom NOC Delete Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={!!deleteTargetId}
         onClose={() => setDeleteTargetId(null)}
@@ -711,7 +725,6 @@ export default function DashboardPage() {
         description="Are you sure you want to delete this service probe target? Active monitoring and historical telemetry logs for this service will be permanently purged."
       />
 
-      {/* Delete Group Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={!!deleteGroupTargetName}
         onClose={() => setDeleteGroupTargetName(null)}

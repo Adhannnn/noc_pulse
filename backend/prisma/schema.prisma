@@ -182,6 +182,10 @@ model HostMetric {
   ramUsedMb   Float    // RAM terpakai (MB)
   ramTotalMb  Float    // Total RAM (MB)
   diskUsagePct Float   // Disk terpakai (%)
+  diskUsedGb    Float
+  diskTotalGb   Float
+  diskReadKb    Float    @default(0)
+  diskWriteKb   Float    @default(0)
   networkInKb Float    // Network Rx (KB/s)
   networkOutKb Float   // Network Tx (KB/s)
   timestamp   DateTime @default(now())
@@ -232,3 +236,4 @@ model DatabaseConnection {
 
   @@map("database_connections")
 }
+

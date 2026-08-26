@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 
 import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 
 @Injectable()
 export class MetricsService {
@@ -18,40 +19,20 @@ export class MetricsService {
 
   async onApplicationBootstrap() {
     this.logger.log('Executing initial host metrics collection...');
-    // Purge old stale metric history from database to ensure fresh host RAM is displayed
+    // Purge old stale metric history from database to ensure fresh host data is displayed
     await this.prisma.hostMetric.deleteMany({}).catch(() => {});
     await this.collectAndBroadcastMetrics();
   }
 
-  private getCgroupMemoryLimit(): number | null {
-    const paths = [
-      '/host/sys/fs/cgroup/memory.max',
-      '/sys/fs/cgroup/memory.max',
-      '/host/sys/fs/cgroup/memory/memory.limit_in_bytes',
-      '/sys/fs/cgroup/memory/memory.limit_in_bytes',
-    ];
-
-    for (const p of paths) {
-      try {
-        if (fs.existsSync(p)) {
-          const valStr = fs.readFileSync(p, 'utf-8').trim();
-          if (valStr && valStr !== 'max') {
-            const bytes = parseInt(valStr, 10);
-            if (bytes > 0 && bytes < 1099511627776) {
-              return bytes;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-    return null;
-  }
-
+  /**
+   * Baca RAM asli host dari /host/proc/meminfo (bind-mounted dari docker-compose).
+   * Tidak ada override manual — angka murni dari kernel host.
+   */
   private getMemoryStats(mem: si.Systeminformation.MemData) {
+    // Fallback awal kalau /proc/meminfo host gagal dibaca sama sekali
     let totalBytes = mem.total;
     let usedBytes = mem.active || (mem.total - mem.available) || mem.used;
 
-    // 1. Read /proc/meminfo
     const targetPath = fs.existsSync('/host/proc/meminfo')
       ? '/host/proc/meminfo'
       : fs.existsSync('/proc/meminfo')
@@ -86,25 +67,16 @@ export class MetricsService {
           const availableKb = memAvailableKb || (memFreeKb + buffersKb + cachedKb);
           usedBytes = (memTotalKb - availableKb) * 1024;
         }
-      } catch (_) {}
-    }
-
-    // 2. Apply cgroup RAM limit if set
-    const cgroupLimitBytes = this.getCgroupMemoryLimit();
-    if (cgroupLimitBytes && cgroupLimitBytes < totalBytes) {
-      totalBytes = cgroupLimitBytes;
-    }
-
-    // 3. Apply HOST_TOTAL_RAM_GB override if specified
-    if (process.env.HOST_TOTAL_RAM_GB) {
-      const envRamGb = parseFloat(process.env.HOST_TOTAL_RAM_GB);
-      if (!isNaN(envRamGb) && envRamGb > 0) {
-        totalBytes = envRamGb * 1024 * 1024 * 1024;
+      } catch (err) {
+        this.logger.warn(`Failed to parse ${targetPath}: ${err}`);
       }
+    } else {
+      this.logger.warn('Host /proc/meminfo not accessible, falling back to container-view memory stats');
     }
 
-    if (usedBytes > totalBytes) {
-      usedBytes = Math.round(totalBytes * 0.5);
+    // Guard basic saja (data korup/negatif), bukan tempat nyuntik angka palsu
+    if (usedBytes > totalBytes || usedBytes < 0) {
+      usedBytes = 0;
     }
 
     return {
@@ -113,30 +85,66 @@ export class MetricsService {
     };
   }
 
+  /**
+   * Baca kapasitas & pemakaian disk root host langsung via statfs kernel,
+   * lewat bind mount /host/root. Tidak ada fallback angka ngarang —
+   * kalau gagal, return 0 dan biarkan frontend menampilkan "N/A".
+   */
+  private async getHostDiskStats() {
+    try {
+      const stats = await fsp.statfs('/host/root');
+      const totalBytes = stats.blocks * stats.bsize;
+      const freeBytes = stats.bavail * stats.bsize; // bavail = tersedia utk non-root, lebih akurat dari bfree
+      const usedBytes = totalBytes - freeBytes;
+
+      if (totalBytes <= 0) {
+        throw new Error('statfs returned zero total blocks');
+      }
+
+      return {
+        diskTotalGb: Number((totalBytes / 1024 ** 3).toFixed(1)),
+        diskUsedGb: Number((usedBytes / 1024 ** 3).toFixed(1)),
+        diskUsagePct: Number(((usedBytes / totalBytes) * 100).toFixed(2)),
+      };
+    } catch (error) {
+      this.logger.error('Failed to read host disk stats from /host/root', error as Error);
+      return { diskTotalGb: 0, diskUsedGb: 0, diskUsagePct: 0 };
+    }
+  }
+
+  /**
+   * Baca throughput baca/tulis disk (bytes/sec) via systeminformation.
+   * Ini metrik I/O, beda dari kapasitas/pemakaian di atas.
+   */
+  private async getHostDiskIO() {
+    try {
+      const io = await si.fsStats();
+      return {
+        diskReadKb: Number(((io.rx_sec || 0) / 1024).toFixed(2)),
+        diskWriteKb: Number(((io.wx_sec || 0) / 1024).toFixed(2)),
+      };
+    } catch (error) {
+      this.logger.error('Failed to read disk I/O stats', error as Error);
+      return { diskReadKb: 0, diskWriteKb: 0 };
+    }
+  }
+
   // Cron job setiap 5 detik: Mengumpulkan stats & broadcast via WebSocket
   @Cron('*/5 * * * * *')
   async collectAndBroadcastMetrics() {
     try {
-      const [cpu, mem, fsSize, netStats] = await Promise.all([
+      const [cpu, mem, netStats, diskStats, diskIO] = await Promise.all([
         si.currentLoad(),
         si.mem(),
-        si.fsSize(),
         si.networkStats(),
-    ]);
-
-      const physicalDisk =
-        fsSize.find((f) => f.fs && (f.fs.includes('/dev/sd') || f.fs.includes('/dev/nvme') || f.fs.includes('/dev/mapper'))) ||
-        fsSize.find((f) => f.mount === '/host/root') ||
-        fsSize.find((f) => f.mount === '/') ||
-        fsSize[0] ||
-        { use: 54, size: 106 * 1024 * 1024 * 1024, used: 57.2 * 1024 * 1024 * 1024 };
-
-      const diskTotalGb = Number(((physicalDisk.size || 113816633344) / 1024 / 1024 / 1024).toFixed(1));
-      const diskUsedGb = Number((((physicalDisk.used || (physicalDisk.use / 100) * physicalDisk.size) || 61418520576) / 1024 / 1024 / 1024).toFixed(1));
-      const diskUsagePct = Number((physicalDisk.use || ((diskUsedGb / diskTotalGb) * 100)).toFixed(2));
+        this.getHostDiskStats(),
+        this.getHostDiskIO(),
+      ]);
 
       const net = netStats[0] || { rx_sec: 0, tx_sec: 0 };
       const { ramUsedMb, ramTotalMb } = this.getMemoryStats(mem);
+      const { diskTotalGb, diskUsedGb, diskUsagePct } = diskStats;
+      const { diskReadKb, diskWriteKb } = diskIO;
 
       const metricsData = {
         cpuUsage: Number(cpu.currentLoad.toFixed(2)),
@@ -145,6 +153,8 @@ export class MetricsService {
         diskUsagePct,
         diskUsedGb,
         diskTotalGb,
+        diskReadKb,
+        diskWriteKb,
         networkInKb: Number(((net.rx_sec || 0) / 1024).toFixed(2)),
         networkOutKb: Number(((net.tx_sec || 0) / 1024).toFixed(2)),
         timestamp: new Date(),
@@ -157,9 +167,11 @@ export class MetricsService {
 
       // 2. Broadcast secara Realtime ke Dashboard Frontend via WebSocket
       this.eventsGateway.broadcastHostMetrics(metricsData);
-      this.logger.debug(`Host Metrics: RAM ${ramUsedMb}MB / ${ramTotalMb}MB | Disk ${diskUsagePct}%`);
+      this.logger.debug(
+        `Host Metrics: RAM ${ramUsedMb}MB / ${ramTotalMb}MB | Disk ${diskUsagePct}% (${diskUsedGb}/${diskTotalGb}GB) | IO R:${diskReadKb}KB/s W:${diskWriteKb}KB/s`,
+      );
     } catch (error) {
-      this.logger.error('Failed to collect host metrics', error);
+      this.logger.error('Failed to collect host metrics', error as Error);
     }
   }
 
@@ -189,33 +201,39 @@ export class MetricsService {
 
       const primaryInterface = Array.isArray(netInterfaces)
         ? netInterfaces.find((i) => !i.internal && i.ip4) || netInterfaces[0]
-        : { ip4: '192.168.203.151', iface: 'enp0s3' };
+        : null;
 
-      let realHostname = osInfo.hostname || 'dashboard';
+      let realHostname = osInfo.hostname || 'unknown-host';
       try {
         if (fs.existsSync('/host/proc/sys/kernel/hostname')) {
           realHostname = fs.readFileSync('/host/proc/sys/kernel/hostname', 'utf-8').trim();
         } else if (fs.existsSync('/proc/sys/kernel/hostname')) {
           realHostname = fs.readFileSync('/proc/sys/kernel/hostname', 'utf-8').trim();
         }
-      } catch (_) {}
+      } catch (err) {
+        this.logger.warn(`Failed to read host hostname: ${err}`);
+      }
 
       return {
         hostname: realHostname,
-        os: `${osInfo.distro || 'Debian GNU/Linux'} ${osInfo.release || '12'}`,
-        kernel: osInfo.kernel || 'Linux',
+        os: `${osInfo.distro || 'Unknown'} ${osInfo.release || ''}`.trim(),
+        kernel: osInfo.kernel || 'Unknown',
         uptime: formattedUptime,
-        cpuCores: `${cpu.cores || 2} cores`,
-        ipAddress: `${primaryInterface.ip4 || '192.168.1.10'} (${primaryInterface.iface || 'eth0'})`,
+        cpuCores: `${cpu.cores || 0} cores`,
+        ipAddress: primaryInterface?.ip4
+          ? `${primaryInterface.ip4} (${primaryInterface.iface})`
+          : 'Unavailable',
       };
     } catch (error) {
+      this.logger.error('Failed to collect server info', error as Error);
+      // Tidak lempar data fiktif — beri tahu FE bahwa data gagal diambil
       return {
-        hostname: 'dashboard',
-        os: 'Debian GNU/Linux 13 (trixie)',
-        kernel: '6.12.48+deb13-cloud-amd64',
-        uptime: 'up 2 days, 3 hours, 46 minutes',
-        cpuCores: '4 cores',
-        ipAddress: '192.168.203.151 (enp0s3)',
+        hostname: 'Unavailable',
+        os: 'Unavailable',
+        kernel: 'Unavailable',
+        uptime: 'Unavailable',
+        cpuCores: 'Unavailable',
+        ipAddress: 'Unavailable',
       };
     }
   }
