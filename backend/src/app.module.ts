@@ -14,6 +14,7 @@ import { IpManagementModule } from './ip-management/ip-management.module';
 import { BackupsModule } from './backups/backups.module';
 import { DatabasesModule } from './databases/databases.module';
 import { GroupsModule } from './groups/groups.module';
+import { SshModule } from './ssh/ssh.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { GroupsModule } from './groups/groups.module';
     BackupsModule,
     DatabasesModule,
     GroupsModule,
+    SshModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -19,6 +19,8 @@ import MtBackupView from '@/components/MtBackupView';
 import IncidentsView from '@/components/IncidentsView';
 import AlertChannelsView from '@/components/AlertChannelsView';
 import UserManagement from '@/components/UserManagement';
+import MemoryDetailView from '@/components/MemoryDetailView';
+import SshTerminalView from '@/components/SshTerminalView';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -66,6 +68,7 @@ export default function DashboardPage() {
   const [targetGroupForNewService, setTargetGroupForNewService] = useState<string | undefined>(undefined);
   const [registeredGroups, setRegisteredGroups] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [showMemoryDetail, setShowMemoryDetail] = useState(false);
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -295,6 +298,7 @@ export default function DashboardPage() {
     setCurrentTab(tab);
     setSelectedMonitor(null);
     setSelectedGroup(null);
+    setShowMemoryDetail(false);
   };
 
   return (
@@ -360,91 +364,95 @@ export default function DashboardPage() {
         ) : (
           <>
             {currentTab === 'OVERVIEW' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        TOTAL SERVICES
+              showMemoryDetail ? (
+                <MemoryDetailView onBack={() => setShowMemoryDetail(false)} />
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          TOTAL SERVICES
+                        </div>
+                        <div className="text-2xl font-extrabold text-white font-mono mt-1">
+                          {totalServices}
+                        </div>
                       </div>
-                      <div className="text-2xl font-extrabold text-white font-mono mt-1">
-                        {totalServices}
+                      <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-300">
+                        <Layers className="w-5 h-5" />
                       </div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-300">
-                      <Layers className="w-5 h-5" />
+
+                    <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          ONLINE
+                        </div>
+                        <div className="text-2xl font-extrabold text-emerald-400 font-mono mt-1">
+                          {onlineServices}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          OFFLINE
+                        </div>
+                        <div className="text-2xl font-extrabold text-rose-400 font-mono mt-1">
+                          {offlineServices}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          AVG LATENCY
+                        </div>
+                        <div className="text-2xl font-extrabold text-amber-400 font-mono mt-1">
+                          {avgLatency}ms
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm col-span-2 sm:col-span-1">
+                      <div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          DATA CENTERS
+                        </div>
+                        <div className="text-2xl font-extrabold text-indigo-400 font-mono mt-1">
+                          {Object.keys(groupedMonitors).length}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                        <Database className="w-5 h-5" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        ONLINE
-                      </div>
-                      <div className="text-2xl font-extrabold text-emerald-400 font-mono mt-1">
-                        {onlineServices}
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
+                    <div className="lg:col-span-4">
+                      <ServerInfoCard />
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className="lg:col-span-4">
+                      <CircularGauge
+                        title="MEMORY"
+                        percentage={ramPct}
+                        usedLabel={`${ramUsedGb} / ${ramTotalGb} GB`}
+                        type="memory"
+                        onClick={() => setShowMemoryDetail(true)}
+                      />
                     </div>
-                  </div>
-
-                  <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        OFFLINE
-                      </div>
-                      <div className="text-2xl font-extrabold text-rose-400 font-mono mt-1">
-                        {offlineServices}
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                      <AlertTriangle className="w-5 h-5" />
-                    </div>
-                  </div>
-
-                  <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        AVG LATENCY
-                      </div>
-                      <div className="text-2xl font-extrabold text-amber-400 font-mono mt-1">
-                        {avgLatency}ms
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                      <Zap className="w-5 h-5" />
-                    </div>
-                  </div>
-
-                  <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm col-span-2 sm:col-span-1">
-                    <div>
-                      <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        DATA CENTERS
-                      </div>
-                      <div className="text-2xl font-extrabold text-indigo-400 font-mono mt-1">
-                        {Object.keys(groupedMonitors).length}
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                      <Database className="w-5 h-5" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
-                  <div className="lg:col-span-4">
-                    <ServerInfoCard />
-                  </div>
-                  <div className="lg:col-span-4">
-                    <CircularGauge
-                      title="MEMORY"
-                      percentage={ramPct}
-                      usedLabel={`${ramUsedGb} / ${ramTotalGb} GB`}
-                      type="memory"
-                    />
-                  </div>
                   <div className="lg:col-span-4">
                     <CircularGauge
                       title="STORAGE (/)"
@@ -546,7 +554,8 @@ export default function DashboardPage() {
                   })
                 )}
               </div>
-            )}
+            )
+          )}
 
             {currentTab === 'SERVICES' && (
               <div className="space-y-5">
@@ -688,6 +697,7 @@ export default function DashboardPage() {
             {currentTab === 'MTBACKUP' && <MtBackupView />}
             {currentTab === 'ALERTS' && <AlertChannelsView />}
             {currentTab === 'USERS' && <UserManagement />}
+            {currentTab === 'SSH' && <SshTerminalView />}
           </>
         )}
       </main>

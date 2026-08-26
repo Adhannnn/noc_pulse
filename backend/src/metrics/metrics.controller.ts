@@ -16,4 +16,9 @@ export class MetricsController {
   getServerInfo() {
     return this.metricsService.getServerInfo();
   }
+
+  @Get('memory-detail')
+  getMemoryDetail() {
+    return this.metricsService.getDetailedMemoryStats();
+  }
 }

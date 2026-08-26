@@ -85,6 +85,64 @@ export class MetricsService {
     };
   }
 
+  async getDetailedMemoryStats() {
+    const mem = await si.mem();
+    let totalBytes = mem.total;
+    let availableBytes = mem.available;
+    let freeBytes = mem.free;
+    let buffersBytes = mem.buffers || 0;
+    let cachedBytes = mem.cached || 0;
+    let swapTotalBytes = mem.swaptotal || 0;
+    let swapUsedBytes = mem.swapused || 0;
+
+    const targetPath = fs.existsSync('/host/proc/meminfo')
+      ? '/host/proc/meminfo'
+      : fs.existsSync('/proc/meminfo')
+      ? '/proc/meminfo'
+      : null;
+
+    if (targetPath) {
+      try {
+        const content = fs.readFileSync(targetPath, 'utf-8');
+        const lines = content.split('\n');
+        lines.forEach((line) => {
+          const parts = line.split(':');
+          if (parts.length === 2) {
+            const key = parts[0].trim();
+            const val = parseInt(parts[1].trim().split(/\s+/)[0], 10) * 1024;
+            if (key === 'MemTotal') totalBytes = val;
+            if (key === 'MemAvailable') availableBytes = val;
+            if (key === 'MemFree') freeBytes = val;
+            if (key === 'Buffers') buffersBytes = val;
+            if (key === 'Cached') cachedBytes = val;
+            if (key === 'SwapTotal') swapTotalBytes = val;
+            if (key === 'SwapFree') swapUsedBytes = Math.max(0, swapTotalBytes - val);
+          }
+        });
+      } catch (_) {}
+    }
+
+    const available = availableBytes || (freeBytes + buffersBytes + cachedBytes);
+    const usedBytes = Math.max(0, totalBytes - available);
+    const activeBytes = Math.max(0, usedBytes - buffersBytes - cachedBytes);
+
+    return {
+      totalGb: Number((totalBytes / (1024 ** 3)).toFixed(2)),
+      usedGb: Number((usedBytes / (1024 ** 3)).toFixed(2)),
+      availableGb: Number((available / (1024 ** 3)).toFixed(2)),
+      freeGb: Number((freeBytes / (1024 ** 3)).toFixed(2)),
+      activeGb: Number((activeBytes / (1024 ** 3)).toFixed(2)),
+      buffersMb: Number((buffersBytes / (1024 ** 2)).toFixed(2)),
+      cachedMb: Number((cachedBytes / (1024 ** 2)).toFixed(2)),
+      swapTotalGb: Number((swapTotalBytes / (1024 ** 3)).toFixed(2)),
+      swapUsedGb: Number((swapUsedBytes / (1024 ** 3)).toFixed(2)),
+      usedPct: totalBytes > 0 ? Number(((usedBytes / totalBytes) * 100).toFixed(1)) : 0,
+      activePct: totalBytes > 0 ? Number(((activeBytes / totalBytes) * 100).toFixed(1)) : 0,
+      cachedPct: totalBytes > 0 ? Number((((buffersBytes + cachedBytes) / totalBytes) * 100).toFixed(1)) : 0,
+      freePct: totalBytes > 0 ? Number(((freeBytes / totalBytes) * 100).toFixed(1)) : 0,
+    };
+  }
+
   /**
    * Baca kapasitas & pemakaian disk root host langsung via statfs kernel,
    * lewat bind mount /host/root. Tidak ada fallback angka ngarang —

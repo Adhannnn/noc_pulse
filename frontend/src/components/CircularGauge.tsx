@@ -9,9 +9,10 @@ interface CircularGaugeProps {
   percentage: number;
   usedLabel: string;
   type: 'memory' | 'storage';
+  onClick?: () => void;
 }
 
-export default function CircularGauge({ title, percentage, usedLabel, type }: CircularGaugeProps) {
+export default function CircularGauge({ title, percentage, usedLabel, type, onClick }: CircularGaugeProps) {
   const clampPct = Math.min(Math.max(percentage, 0), 100);
   const strokeWidth = 14;
   const radius = 64;
@@ -22,15 +23,27 @@ export default function CircularGauge({ title, percentage, usedLabel, type }: Ci
   const gradientId = isMemory ? 'memoryGradient' : 'storageGradient';
 
   return (
-    <div className="bg-[#121829] border border-[#1E2640] rounded-2xl p-5 shadow-sm text-slate-100 flex flex-col justify-between h-full relative overflow-hidden">
+    <div
+      onClick={onClick}
+      className={`bg-[#121829] border border-[#1E2640] rounded-2xl p-5 shadow-sm text-slate-100 flex flex-col justify-between h-full relative overflow-hidden group transition-all duration-300 ${
+        onClick ? 'cursor-pointer hover:border-purple-500/50 hover:shadow-purple-500/10' : ''
+      }`}
+    >
       {/* Header */}
-      <div className="flex items-center gap-2 text-slate-400 text-xs font-mono uppercase tracking-wider font-bold">
-        {isMemory ? (
-          <MemoryStick className="w-4 h-4 text-purple-400" />
-        ) : (
-          <HardDrive className="w-4 h-4 text-amber-400" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-slate-400 text-xs font-mono uppercase tracking-wider font-bold">
+          {isMemory ? (
+            <MemoryStick className="w-4 h-4 text-purple-400" />
+          ) : (
+            <HardDrive className="w-4 h-4 text-amber-400" />
+          )}
+          <span>{title}</span>
+        </div>
+        {onClick && isMemory && (
+          <span className="text-[10px] font-mono text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+            Details →
+          </span>
         )}
-        <span>{title}</span>
       </div>
 
       {/* Gauge Canvas */}

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Server,
   Database,
+  Terminal,
   ShieldAlert,
   Layers,
   HardDrive,
@@ -24,7 +25,8 @@ export type NOCNavSection =
   | 'IPMANAGEMENT'
   | 'MTBACKUP'
   | 'ALERTS'
-  | 'USERS';
+  | 'USERS'
+  | 'SSH';
 
 interface SidebarProps {
   currentTab: NOCNavSection;
@@ -100,6 +102,18 @@ export default function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
               >
                 <Database className="w-4 h-4 text-purple-400" />
                 <span>Databases</span>
+              </button>
+
+              <button
+                onClick={() => onSelectTab('SSH')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition ${
+                  currentTab === 'SSH'
+                    ? 'bg-indigo-600 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-[#161C2E]'
+                }`}
+              >
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span>SSH Console</span>
               </button>
             </div>
           </div>
