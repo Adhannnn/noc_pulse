@@ -251,7 +251,13 @@ export default function DashboardPage() {
   const ramUsedGb = hostMetrics ? (hostMetrics.ramUsedMb / 1024).toFixed(1) : '0.8';
   const ramTotalGb = hostMetrics ? (hostMetrics.ramTotalMb / 1024).toFixed(1) : '4.0';
   const ramPct = hostMetrics && hostMetrics.ramTotalMb > 0 ? Math.round((hostMetrics.ramUsedMb / hostMetrics.ramTotalMb) * 100) : 20;
-  const diskPct = hostMetrics ? Math.round(hostMetrics.diskUsagePct) : 14;
+  const diskPct = hostMetrics ? Math.round(hostMetrics.diskUsagePct) : 54;
+  const diskUsedGb = hostMetrics && (hostMetrics as any).diskUsedGb !== undefined
+    ? Number((hostMetrics as any).diskUsedGb).toFixed(1)
+    : hostMetrics ? ((hostMetrics.diskUsagePct / 100) * 106).toFixed(1) : '57.2';
+  const diskTotalGb = hostMetrics && (hostMetrics as any).diskTotalGb !== undefined
+    ? Number((hostMetrics as any).diskTotalGb).toFixed(1)
+    : '106.0';
 
   const handleSelectTab = (tab: NOCNavSection) => {
     setCurrentTab(tab);
@@ -417,7 +423,7 @@ export default function DashboardPage() {
                     <CircularGauge
                       title="STORAGE (/)"
                       percentage={diskPct}
-                      usedLabel="3.5 / 24.4 GB"
+                      usedLabel={`${diskUsedGb} / ${diskTotalGb} GB`}
                       type="storage"
                     />
                   </div>

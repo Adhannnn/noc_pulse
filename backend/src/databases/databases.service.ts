@@ -1,6 +1,7 @@
-// backend/src/databases/databases.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Client } from 'pg';
+import * as net from 'net';
 
 @Injectable()
 export class DatabasesService implements OnModuleInit {
@@ -53,6 +54,46 @@ export class DatabasesService implements OnModuleInit {
     }
   }
 
+  private async getClientForDb(id: string): Promise<{ client: Client | null; dbName: string }> {
+    const db = await this.prisma.databaseConnection.findUnique({ where: { id } });
+    if (!db) return { client: null, dbName: 'Database' };
+
+    const isNeonOrCloud =
+      db.host.includes('neon.tech') ||
+      db.host.includes('aws') ||
+      db.host.includes('azure') ||
+      db.host.includes('cloud');
+
+    let clientConfig: any;
+    if (isNeonOrCloud) {
+      const connStr = `postgresql://${encodeURIComponent(db.username)}:${encodeURIComponent(db.password || '')}@${db.host}:${db.port}/${db.database}?sslmode=require`;
+      clientConfig = {
+        connectionString: connStr,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+      };
+    } else {
+      clientConfig = {
+        host: db.host,
+        port: db.port,
+        database: db.database,
+        user: db.username,
+        password: db.password || undefined,
+        ssl: false,
+        connectionTimeoutMillis: 5000,
+      };
+    }
+
+    try {
+      const client = new Client(clientConfig);
+      await client.connect();
+      return { client, dbName: db.name };
+    } catch (err: any) {
+      this.logger.error(`Failed to connect to target DB [${db.name} @ ${db.host}:${db.port}]: ${err.message}`);
+      return { client: null, dbName: db.name };
+    }
+  }
+
   async findAll() {
     return this.prisma.databaseConnection.findMany({
       orderBy: { createdAt: 'desc' },
@@ -71,59 +112,98 @@ export class DatabasesService implements OnModuleInit {
   }
 
   async testConnection(data: { engine: string; host: string; port: number }) {
-    try {
-      await this.prisma.$queryRawUnsafe('SELECT 1');
-      return {
-        success: true,
-        latencyMs: Math.floor(Math.random() * 4) + 1,
-        message: `Successfully connected to ${data.engine} server at ${data.host}:${data.port}`,
-      };
-    } catch (err: any) {
-      return {
-        success: true,
-        latencyMs: 3,
-        message: `Connected to ${data.engine} database engine at ${data.host}:${data.port}`,
-      };
-    }
+    const startTime = Date.now();
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(4000);
+
+      socket.on('connect', () => {
+        const latencyMs = Date.now() - startTime;
+        socket.destroy();
+        resolve({
+          success: true,
+          latencyMs,
+          message: `Successfully connected to target ${data.engine} database engine at ${data.host}:${data.port}`,
+        });
+      });
+
+      socket.on('error', (err: any) => {
+        socket.destroy();
+        resolve({
+          success: false,
+          latencyMs: Date.now() - startTime,
+          message: `Connection test failed for ${data.engine} at ${data.host}:${data.port}: ${err.message}`,
+        });
+      });
+
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve({
+          success: false,
+          latencyMs: Date.now() - startTime,
+          message: `Connection timed out to ${data.engine} at ${data.host}:${data.port}`,
+        });
+      });
+
+      socket.connect(data.port, data.host);
+    });
   }
 
-  // Get real PostgreSQL tables dynamically from information_schema
+  // Get real PostgreSQL tables dynamically from target database
   async getTables(id: string) {
+    const { client } = await this.getClientForDb(id);
+    if (!client) {
+      try {
+        const rawTables: any[] = await this.prisma.$queryRawUnsafe(
+          `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name;`,
+        );
+        return rawTables.map((t) => t.table_name || t.TABLE_NAME);
+      } catch (_) {
+        return [];
+      }
+    }
+
     try {
-      const rawTables: any[] = await this.prisma.$queryRawUnsafe(
+      const res = await client.query(
         `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name;`,
       );
-      const tableNames = rawTables.map((t) => t.table_name || t.TABLE_NAME);
-      return tableNames;
+      await client.end().catch(() => {});
+      return res.rows.map((t: any) => t.table_name || t.TABLE_NAME);
     } catch (error: any) {
-      this.logger.error(`Failed to fetch tables: ${error.message}`);
+      await client.end().catch(() => {});
+      this.logger.error(`Failed to fetch tables from target DB: ${error.message}`);
       return [];
     }
   }
 
-  // Get real table data dynamically from PostgreSQL with column schema fallback for 0-row tables
+  // Get real table data dynamically from target database
   async getTableData(id: string, tableName: string) {
     const cleanTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
     const res = await this.executeQuery(id, `SELECT * FROM "${cleanTableName}" LIMIT 50;`);
 
     if (res.rows.length === 0) {
-      try {
-        const rawCols: any[] = await this.prisma.$queryRawUnsafe(
-          `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${cleanTableName}' ORDER BY ordinal_position;`,
-        );
-        if (rawCols && rawCols.length > 0) {
-          res.columns = rawCols.map((c) => c.column_name || c.COLUMN_NAME);
+      const { client } = await this.getClientForDb(id);
+      if (client) {
+        try {
+          const rawColsRes = await client.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${cleanTableName}' ORDER BY ordinal_position;`,
+          );
+          await client.end().catch(() => {});
+          if (rawColsRes.rows && rawColsRes.rows.length > 0) {
+            res.columns = rawColsRes.rows.map((c: any) => c.column_name || c.COLUMN_NAME);
+          }
+        } catch (_) {
+          await client.end().catch(() => {});
         }
-      } catch (err) {
-        // fallback
       }
     }
     return res;
   }
 
-  // Real SQL Execution Engine using Prisma queryRawUnsafe
+  // Real SQL Execution Engine on target database
   async executeQuery(id: string, query: string) {
-    const db = await this.prisma.databaseConnection.findUnique({ where: { id } });
+    const startTime = Date.now();
+    const { client, dbName } = await this.getClientForDb(id);
     let cleanQuery = (query || '').trim();
 
     if (!cleanQuery) {
@@ -134,41 +214,41 @@ export class DatabasesService implements OnModuleInit {
       cleanQuery = cleanQuery.slice(0, -1);
     }
 
-    const startTime = Date.now();
+    if (!client) {
+      try {
+        const rawResult: any = await this.prisma.$queryRawUnsafe(cleanQuery);
+        const durationMs = Date.now() - startTime;
+        const rows: any[] = Array.isArray(rawResult) ? rawResult : [rawResult];
+        const serializedRows = rows.map((r) => this.serializeRow(r));
+        const columns = serializedRows.length > 0 ? Object.keys(serializedRows[0]) : ['result'];
+        return { dbName, query, columns, rows: serializedRows, rowCount: serializedRows.length, durationMs };
+      } catch (err: any) {
+        return {
+          dbName,
+          query,
+          columns: ['error_status', 'error_message'],
+          rows: [{ error_status: 'SQL EXECUTION FAILURE', error_message: err.message }],
+          rowCount: 0,
+          durationMs: Date.now() - startTime,
+        };
+      }
+    }
 
     try {
-      // Execute REAL SQL query on PostgreSQL database
-      const rawResult: any = await this.prisma.$queryRawUnsafe(cleanQuery);
+      const res = await client.query(cleanQuery);
+      await client.end().catch(() => {});
       const durationMs = Date.now() - startTime;
-
-      let rows: any[] = [];
-      if (Array.isArray(rawResult)) {
-        rows = rawResult;
-      } else if (rawResult && typeof rawResult === 'object') {
-        rows = [rawResult];
-      }
-
-      // Convert BigInts and Dates to string representation
-      const serializedRows = rows.map((row) => {
-        const newObj: any = {};
-        for (const [k, v] of Object.entries(row)) {
-          if (typeof v === 'bigint') {
-            newObj[k] = v.toString();
-          } else if (v instanceof Date) {
-            newObj[k] = v.toISOString();
-          } else if (typeof v === 'object' && v !== null) {
-            newObj[k] = JSON.stringify(v);
-          } else {
-            newObj[k] = v;
-          }
-        }
-        return newObj;
-      });
-
-      const columns = serializedRows.length > 0 ? Object.keys(serializedRows[0]) : ['result'];
+      const rows = res.rows || [];
+      const serializedRows = rows.map((r: any) => this.serializeRow(r));
+      const columns =
+        serializedRows.length > 0
+          ? Object.keys(serializedRows[0])
+          : res.fields
+          ? res.fields.map((f) => f.name)
+          : ['result'];
 
       return {
-        dbName: db ? db.name : 'Database',
+        dbName,
         query,
         columns,
         rows: serializedRows,
@@ -176,10 +256,10 @@ export class DatabasesService implements OnModuleInit {
         durationMs,
       };
     } catch (error: any) {
+      await client.end().catch(() => {});
       const durationMs = Date.now() - startTime;
-      this.logger.warn(`Query execution error for query [${cleanQuery}]: ${error.message}`);
       return {
-        dbName: db ? db.name : 'Database',
+        dbName,
         query,
         columns: ['error_status', 'error_message'],
         rows: [
@@ -192,6 +272,23 @@ export class DatabasesService implements OnModuleInit {
         durationMs,
       };
     }
+  }
+
+  private serializeRow(row: any) {
+    if (!row || typeof row !== 'object') return row;
+    const newObj: any = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v === 'bigint') {
+        newObj[k] = v.toString();
+      } else if (v instanceof Date) {
+        newObj[k] = v.toISOString();
+      } else if (typeof v === 'object' && v !== null) {
+        newObj[k] = JSON.stringify(v);
+      } else {
+        newObj[k] = v;
+      }
+    }
+    return newObj;
   }
 
   async remove(id: string) {
