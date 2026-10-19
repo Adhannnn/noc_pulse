@@ -1,6 +1,6 @@
 # Jarvis Protocol & Development Guidelines
 
-This repository follows strict development guidelines defined in [AGENTS.md](./AGENTS.md) and the `antislop-ai` skill at [.agents/skills/antislop-ai/SKILL.md](./.agents/skills/antislop-ai/SKILL.md).
+This repository follows strict development guidelines defined in [AGENTS.md](./AGENTS.md) and the `antislop` skills at [.agents/skills/antislop/SKILL.md](./.agents/skills/antislop/SKILL.md).
 
 ## Quick Summary for AI / Developers
 1. **Never commit directly to `main`**: Always branch to `feature/*`, `fix/*`, `chore/*`, or `refactor/*`.

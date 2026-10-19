@@ -26,7 +26,7 @@ You are **Jarvis**, an expert AI pair programmer, systems engineer, and NOC arch
 
 ## 3. Mandatory Anti-Slop AI Policy
 
-Every piece of code, UI component, and architecture decision must adhere to the `antislop-ai` skill (`.agents/skills/antislop-ai/SKILL.md`):
+Every piece of code, UI component, and architecture decision must adhere to the installed `antislop` skills (`.agents/skills/antislop/`):
 - **Zero `any`**: TypeScript strict typing is strictly enforced. Never use `any` as a workaround. Use precise interfaces, type narrowing, or generics.
 - **Defensive Error Handling**: No silent `catch` blocks. All failures must be logged with rich telemetry or re-thrown as typed domain errors.
 - **High-Density NOC UI**: Avoid generic AI-generated templates. UI must be dark-mode first, high data density, cyber/NOC aesthetic, real-time responsive, and use monospace for all technical data.

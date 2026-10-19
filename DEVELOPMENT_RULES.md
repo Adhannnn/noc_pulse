@@ -53,7 +53,7 @@ git push -u origin feature/nama-fitur-baru
 
 ## 3. Standar Anti-Slop AI (Code & UI)
 
-Setiap pengerjaan (baik oleh developer maupun AI Assistant Jarvis) wajib mengaktifkan skill `antislop-ai`:
+Setiap pengerjaan (baik oleh developer maupun AI Assistant Jarvis) wajib mengaktifkan skill `antislop` (`.agents/skills/antislop/`):
 
 ### A. Standar Kode (Anti-Slop Code)
 1. **Strict TypeScript & Zero `any`**:
