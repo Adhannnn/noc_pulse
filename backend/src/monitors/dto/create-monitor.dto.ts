@@ -1,5 +1,13 @@
 // backend/src/monitors/dto/create-monitor.dto.ts
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { MonitorType } from '@prisma/client';
 
 export class CreateMonitorDto {

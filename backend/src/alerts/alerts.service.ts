@@ -30,7 +30,9 @@ export class AlertsService {
       return;
     }
 
-    this.logger.log(`Dispatching ${payload.status} alert to ${channels.length} channels...`);
+    this.logger.log(
+      `Dispatching ${payload.status} alert to ${channels.length} channels...`,
+    );
 
     await Promise.all(
       channels.map(async (channel) => {
@@ -41,7 +43,10 @@ export class AlertsService {
             await this.sendTelegramAlert(channel, payload);
           }
         } catch (error: any) {
-          this.logger.error(`Failed to send alert to channel ${channel.name}:`, error.message);
+          this.logger.error(
+            `Failed to send alert to channel ${channel.name}:`,
+            error.message,
+          );
         }
       }),
     );
@@ -67,13 +72,25 @@ export class AlertsService {
     ];
 
     if (payload.statusCode) {
-      fields.push({ name: 'HTTP Status', value: `${payload.statusCode}`, inline: true });
+      fields.push({
+        name: 'HTTP Status',
+        value: `${payload.statusCode}`,
+        inline: true,
+      });
     }
     if (payload.errorMessage) {
-      fields.push({ name: 'Error Message', value: `\`${payload.errorMessage}\``, inline: false });
+      fields.push({
+        name: 'Error Message',
+        value: `\`${payload.errorMessage}\``,
+        inline: false,
+      });
     }
     if (payload.downtimeDuration) {
-      fields.push({ name: 'Total Downtime', value: payload.downtimeDuration, inline: true });
+      fields.push({
+        name: 'Total Downtime',
+        value: payload.downtimeDuration,
+        inline: true,
+      });
     }
 
     await axios.post(channel.webhookUrl, {
@@ -93,12 +110,17 @@ export class AlertsService {
   }
 
   // 3. Format & Kirim ke Telegram Bot API
-  private async sendTelegramAlert(channel: AlertChannel, payload: AlertPayload) {
+  private async sendTelegramAlert(
+    channel: AlertChannel,
+    payload: AlertPayload,
+  ) {
     const token = channel.botToken || process.env.TELEGRAM_DEFAULT_BOT_TOKEN;
     const chatId = channel.chatId || process.env.TELEGRAM_DEFAULT_CHAT_ID;
 
     if (!token || !chatId) {
-      this.logger.warn(`Telegram channel ${channel.name} is missing Bot Token or Chat ID.`);
+      this.logger.warn(
+        `Telegram channel ${channel.name} is missing Bot Token or Chat ID.`,
+      );
       return;
     }
 
@@ -113,8 +135,10 @@ export class AlertsService {
     message += `*Latency:* ${payload.latencyMs || 0} ms\n`;
 
     if (payload.statusCode) message += `*HTTP Status:* ${payload.statusCode}\n`;
-    if (payload.errorMessage) message += `*Reason:* \`${payload.errorMessage}\`\n`;
-    if (payload.downtimeDuration) message += `*Total Downtime:* ${payload.downtimeDuration}\n`;
+    if (payload.errorMessage)
+      message += `*Reason:* \`${payload.errorMessage}\`\n`;
+    if (payload.downtimeDuration)
+      message += `*Total Downtime:* ${payload.downtimeDuration}\n`;
     message += `\n_Timestamp: ${new Date().toLocaleString('id-ID')}_`;
 
     await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -126,7 +150,9 @@ export class AlertsService {
 
   // 4. Test Webhook Trigger
   async testChannel(channelId: string) {
-    const channel = await this.prisma.alertChannel.findUnique({ where: { id: channelId } });
+    const channel = await this.prisma.alertChannel.findUnique({
+      where: { id: channelId },
+    });
     if (!channel) throw new Error('Channel not found');
 
     const mockPayload: AlertPayload = {

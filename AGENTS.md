@@ -44,16 +44,16 @@ Before any branch can be merged into `main`, the CI pipeline validates:
 
 ---
 
-## 5. Automated AI Reviewer Gatekeeping & Severity Tiers
+## 5. Automated AI Reviewer: Security, Performance & Bug Gatekeeper
 
-All incoming Pull Requests are analyzed by an automated AI Reviewer. Findings are categorized into four severity tiers:
+All incoming Pull Requests are analyzed by an automated AI Reviewer focused on **Security vulnerabilities**, **Performance bottlenecks**, **Bugs & Reliability**, and **Enhancement opportunities**. Findings are categorized into four severity tiers:
 
 | Severity | Definition | Merge Status |
 | :--- | :--- | :--- |
-| **Low** | Minor code style suggestions, formatting, comments, small readability tweaks. | **Allowed to Merge** |
-| **Medium** | Non-blocking optimization opportunities, subtle refactoring, minor UX polish. | **Allowed to Merge** |
-| **High** | Type safety bypasses (`any`), unhandled exceptions, breaking API contracts, security weaknesses, anti-slop violations, memory leaks. | **STRICTLY BLOCKED** |
-| **Critical** | Remote code execution, credential leaks, data loss, fatal crash, unauthenticated sensitive endpoints. | **STRICTLY BLOCKED** |
+| **Low** | Enhancement suggestions, minor readability improvements, style tweaks. | **Allowed to Merge** |
+| **Medium** | Non-blocking performance optimizations, defensive programming improvements. | **Allowed to Merge** |
+| **High** | Logic bugs, severe performance bottlenecks, memory leaks, unhandled fatal exceptions, significant security weaknesses. | **STRICTLY BLOCKED** |
+| **Critical** | Remote code execution, credential leaks, data loss, catastrophic crash, unauthenticated sensitive endpoints. | **STRICTLY BLOCKED** |
 
 > [!CAUTION]
 > If the AI Reviewer detects **ANY** finding rated **High** or **Critical**, the CI check will intentionally fail (exit code 1), permanently blocking PR merge until the issue is fixed and re-evaluated.

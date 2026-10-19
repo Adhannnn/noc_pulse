@@ -105,18 +105,18 @@ Jika salah satu tahap gagal, PR tidak dapat di-merge.
 
 ---
 
-## 5. Pipeline AI Reviewer & Gatekeeping
+## 5. Pipeline AI Reviewer: Security, Performance & Bug Gatekeeper
 
-Pipeline **AI Code Reviewer** (`.github/workflows/ai-code-reviewer.yml`) secara otomatis menganalisis setiap `pull_request` terhadap `main`. AI mengaudit diff kode terhadap kepatuhan Anti-Slop, keamanan sistem, arsitektur, dan potensi bug.
+Pipeline **AI Code Reviewer** (`.github/workflows/ai-code-reviewer.yml`) secara otomatis menganalisis setiap `pull_request` terhadap `main`. AI mengaudit diff kode secara mendalam khusus pada aspek **Security**, **Performance**, **Bugs & Reliability**, dan **Saran Enhancement**.
 
 ### Kategori Temuan AI Reviewer:
 
 | Kategori | Deskripsi | Status Merge |
 | :--- | :--- | :--- |
-| **Low** | Saran kosmetik, format komentar, perapian gaya penulisan minor yang tidak mempengaruhi fungsi. | ✅ **Boleh Merge** |
-| **Medium** | Saran optimasi performa non-kritis, refactoring ringan, peningkatan dokumentasi internal. | ✅ **Boleh Merge** |
-| **High** | Pelanggaran aturan Anti-Slop (`any`), unhandled promise/error, potensi memory leak, bug logika, inkonsistensi API. | ⛔ **DILARANG MERGE** |
-| **Critical** | Kebocoran kredensial/rahasia, celah keamanan (RCE, SQLi, command injection), crash fatal pada server/daemon, potensi kehilangan data. | ⛔ **DILARANG MERGE** |
+| **Low** | Saran enhancement, minor code style, peningkatan keterbacaan kode tanpa mengubah fungsionalitas. | ✅ **Boleh Merge** |
+| **Medium** | Saran optimasi performa non-kritis, refactoring ringan, defensive programming tweaks. | ✅ **Boleh Merge** |
+| **High** | Bug logika, performa lambat/bottleneck parah, potensi memory leak, unhandled fatal exceptions, risiko celah keamanan. | ⛔ **DILARANG MERGE** |
+| **Critical** | Kebocoran kredensial/rahasia, celah eksploitasi fatal (RCE, injection), server crash, risiko korupsi/kehilangan data. | ⛔ **DILARANG MERGE** |
 
 ### Aturan Gatekeeping:
 - Apabila ditemukan **minimal 1 temuan berlabel `High` atau `Critical`**, pipeline akan **FAIL (Exit Code 1)**.

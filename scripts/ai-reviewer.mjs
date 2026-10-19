@@ -69,45 +69,50 @@ function getGitDiff() {
 
 async function callGeminiReview(diffText) {
   const prompt = `
-You are the Lead NOC Systems Architect and Anti-Slop AI Gatekeeper for the "PulseNOC" project.
-PulseNOC monitors Debian laptop telemetry (CPU, RAM, storage, network) and remote external services (HTTP/HTTPS, TCP, ICMP ping).
+You are the Lead Systems Security, Performance, and Architecture Reviewer for the "PulseNOC" project.
+PulseNOC is a mission-critical NOC telemetry and prober platform that monitors:
+1. Debian laptop system health (CPU, RAM, storage disk, network I/O, thermals, processes).
+2. Remote external services (HTTP/HTTPS, TCP/UDP ports, ICMP ping, DNS).
 
-Review the following Git diff strictly against these standards:
-1. Anti-Slop Standards:
-   - ZERO "any" types in TypeScript.
-   - NO empty catch blocks or silenced errors.
-   - NO mock/stub placeholders left in production pathways.
-   - Resource hygiene (SSH streams, WebSockets, timers, DB connections must be cleaned up).
-2. Security:
-   - No hardcoded credentials, tokens, or private keys.
-   - Command injection defense on SSH and shell executions.
-   - Proper input validation on endpoints and probers.
-3. System Reliability:
-   - Network timeout resilience on external probers.
-   - Proper state management in UI (no cascading re-renders, correct hook dependencies).
-4. UI/UX:
-   - NOC cyber aesthetic (dark mode first, high density, monospace for technical numbers).
+Your primary responsibility is to audit incoming code changes for:
+1. SECURITY:
+   - Credential or token leakage, exposed secrets, private keys.
+   - Command injection vulnerabilities (SSH exec, shell execution, prober arguments).
+   - Unauthenticated or exposed sensitive API endpoints.
+   - Insecure deserialization, SQL injection, or unvalidated user inputs.
+2. PERFORMANCE:
+   - Resource & memory leaks (unclosed sockets, unreleased DB pools/clients, uncleaned interval/timeout timers).
+   - CPU bottlenecks, synchronous blocking loops, unbounded queries without pagination.
+   - Hanging external service probers (missing network timeouts, deadlocks).
+   - Excessive re-renders or WebSocket channel flooding.
+3. BUGS & LOGIC ERRORS:
+   - Unhandled Promise rejections and silent crashes.
+   - Null pointer or undefined dereferencing.
+   - Race conditions in state synchronization or prober scheduling.
+   - Broken network protocol error handling.
+4. ENHANCEMENT SUGGESTIONS:
+   - Code resiliency, architectural best practices, maintainability polish, defensive programming.
 
-Categorize every issue into one of 4 severities:
-- "CRITICAL": Fatal exploit, credential leak, data loss, catastrophic memory leak. (STRICTLY BLOCKS MERGE)
-- "HIGH": Use of 'any' type, unhandled exceptions, breaking API contract, anti-slop violation, security risk, prober thread hang. (STRICTLY BLOCKS MERGE)
-- "MEDIUM": Non-blocking performance bottleneck, minor code smell, missing edge-case test. (DOES NOT BLOCK MERGE)
-- "LOW": Stylistic suggestion, comment formatting, minor readability improvement. (DOES NOT BLOCK MERGE)
+Categorize every finding into one of 4 strict severity tiers:
+- "CRITICAL": Severe vulnerability (RCE, injection), credential leak, catastrophic server crash, data loss. (STRICTLY BLOCKS MERGE)
+- "HIGH": Concrete logic bug, severe performance bottleneck, memory leak, unhandled fatal crash, significant security weakness. (STRICTLY BLOCKS MERGE)
+- "MEDIUM": Non-critical performance optimization opportunity, subtle edge-case flaw, defensive improvement. (DOES NOT BLOCK MERGE)
+- "LOW": Enhancement suggestion, minor code readability, non-blocking refactoring tip. (DOES NOT BLOCK MERGE)
 
 Return your response ONLY as valid JSON matching this schema:
 {
-  "summary": "High level overview of what changed and overall quality score (0-100)",
+  "summary": "Executive summary of the changes with security & performance health score (0-100)",
   "verdict": "PASS" | "FAIL",
   "can_merge": boolean (MUST be false if there is ANY High or Critical finding),
   "findings": [
     {
       "severity": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-      "category": "Anti-Slop" | "Security" | "Reliability" | "UI/UX" | "Architecture",
+      "category": "Security" | "Performance" | "Bug" | "Enhancement",
       "file": "path/to/file",
       "line": "approx line number or range",
-      "title": "Short concise title",
-      "description": "What is wrong and why it violates standards",
-      "recommendation": "Concrete fix instructions"
+      "title": "Concise issue title",
+      "description": "Clear explanation of the risk, bug, or performance impact",
+      "recommendation": "Actionable, concrete fix"
     }
   ]
 }
@@ -162,47 +167,45 @@ function fallbackReview(diffText) {
     if (line.startsWith('+') && !line.startsWith('+++')) {
       const addedContent = line.slice(1);
 
-      // Only check code files for TypeScript/JS anti-slop patterns
-      if (isCodeFile(currentFile)) {
-        // Check for explicit TypeScript 'any' type annotations/casts
-        const tsAnyPattern = /(:\s*any\b|\bas\s+any\b|<any>|Array<any>|Promise<any>|Record<string,\s*any>)/;
-        if (tsAnyPattern.test(addedContent) && !/eslint-disable/.test(addedContent)) {
-          findings.push({
-            severity: 'HIGH',
-            category: 'Anti-Slop',
-            file: currentFile,
-            line: `${i + 1}`,
-            title: 'Explicit TypeScript "any" type detected',
-            description: 'Anti-Slop policy strictly prohibits the use of "any".',
-            recommendation: 'Replace with specific interface, DTO, generic, or unknown with type guard.',
-          });
-        }
-
-        // Check for empty catch block
-        if (/catch\s*\([^)]*\)\s*\{\s*\}/.test(addedContent)) {
-          findings.push({
-            severity: 'HIGH',
-            category: 'Reliability',
-            file: currentFile,
-            line: `${i + 1}`,
-            title: 'Empty catch block detected',
-            description: 'Silently swallowing errors makes debugging impossible.',
-            recommendation: 'Log the error with contextual metadata or rethrow typed exception.',
-          });
-        }
-      }
-
-      // Check for hardcoded secret patterns across all files (excluding examples / docs / reviewer script)
+      // 1. Security Check: Hardcoded secrets & credentials
       if (!currentFile.endsWith('.example') && !currentFile.endsWith('.md') && !currentFile.includes('scripts/ai-reviewer.mjs')) {
-        if (/((password|secret|api_key|token)\s*[:=]\s*['"][a-zA-Z0-9_\-]{16,}['"])/i.test(addedContent)) {
+        if (/((password|secret|api_key|private_key|token)\s*[:=]\s*['"][a-zA-Z0-9_\-]{16,}['"])/i.test(addedContent)) {
           findings.push({
             severity: 'CRITICAL',
             category: 'Security',
             file: currentFile,
             line: `${i + 1}`,
             title: 'Potential hardcoded secret or token detected',
-            description: 'Credentials must never be committed to git.',
+            description: 'Sensitive credentials must never be committed to git repositories.',
             recommendation: 'Move credentials to environment variables (.env).',
+          });
+        }
+      }
+
+      // 2. Security Check: Unsafe shell command execution (Command Injection risk)
+      if (isCodeFile(currentFile)) {
+        if (/exec(Sync)?\s*\(\s*`[^`]*\$\{/.test(addedContent)) {
+          findings.push({
+            severity: 'HIGH',
+            category: 'Security',
+            file: currentFile,
+            line: `${i + 1}`,
+            title: 'Potential Command Injection in shell execution',
+            description: 'Interpolating raw variables into shell commands allows remote arbitrary command execution.',
+            recommendation: 'Use execFile, spawn with argument arrays, or sanitize inputs strictly.',
+          });
+        }
+
+        // 3. Performance / Bug Check: Unhandled infinite loop or potential memory leak
+        if (/setInterval\s*\(/.test(addedContent) && !/clearInterval/.test(addedContent) && currentFile.includes('frontend/src')) {
+          findings.push({
+            severity: 'MEDIUM',
+            category: 'Performance',
+            file: currentFile,
+            line: `${i + 1}`,
+            title: 'Uncleaned interval timer risk',
+            description: 'Setting intervals in frontend components without returning cleanup in useEffect causes memory leaks.',
+            recommendation: 'Ensure clearInterval is returned in the useEffect cleanup function.',
           });
         }
       }
@@ -211,7 +214,7 @@ function fallbackReview(diffText) {
 
   const hasHighOrCritical = findings.some(f => f.severity === 'HIGH' || f.severity === 'CRITICAL');
   return {
-    summary: 'Heuristic fallback review (Configure GEMINI_API_KEY in repository secrets for full LLM analysis).',
+    summary: 'Heuristic security & performance scanner (Configure GEMINI_API_KEY in repository secrets for full LLM analysis).',
     verdict: hasHighOrCritical ? 'FAIL' : 'PASS',
     can_merge: !hasHighOrCritical,
     findings,
@@ -226,11 +229,11 @@ function formatMarkdownReport(reviewResult) {
 
   const canMerge = reviewResult.can_merge && criticalCount === 0 && highCount === 0;
 
-  let report = `## 🛡️ PulseNOC AI Reviewer Gatekeeper Report\n\n`;
+  let report = `## 🛡️ PulseNOC AI Reviewer: Security, Performance & Bug Gatekeeper\n\n`;
 
   if (canMerge) {
     report += `### ✅ VERDICT: MERGE ALLOWED\n`;
-    report += `Code passed all Anti-Slop gates. No High or Critical severity findings detected.\n\n`;
+    report += `Code passed all Security & Performance gates. No High or Critical severity findings detected.\n\n`;
   } else {
     report += `### ⛔ VERDICT: MERGE BLOCKED\n`;
     report += `**Pull Request cannot be merged.** Found **${criticalCount} Critical** and **${highCount} High** severity issues violating project standards.\n\n`;

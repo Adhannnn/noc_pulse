@@ -50,7 +50,10 @@ export class ProberService {
 
       const latencyMs = Math.round(performance.now() - start);
       // HTTP Status 2xx, 3xx, 401, 403 confirm the server daemon is alive and handling traffic
-      const isUp = (response.status >= 200 && response.status < 400) || response.status === 401 || response.status === 403;
+      const isUp =
+        (response.status >= 200 && response.status < 400) ||
+        response.status === 401 ||
+        response.status === 403;
 
       let detailMsg: string | undefined = undefined;
       if (!isUp) {

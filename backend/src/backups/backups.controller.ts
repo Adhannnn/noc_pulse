@@ -13,6 +13,8 @@ export class BackupsController {
 
   @Post('trigger')
   triggerBackup(@Body('deviceName') deviceName: string) {
-    return this.backupsService.triggerBackup(deviceName || 'MikroTik Gateway Router');
+    return this.backupsService.triggerBackup(
+      deviceName || 'MikroTik Gateway Router',
+    );
   }
 }

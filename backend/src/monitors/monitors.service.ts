@@ -1,5 +1,10 @@
 // backend/src/monitors/monitors.service.ts
-import { Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProberService } from '../prober/prober.service';
@@ -125,7 +130,9 @@ export class MonitorsService implements OnApplicationBootstrap {
         // Prevent concurrent overlapping probes on the same target
         if (this.activeProbes.has(m.id)) continue;
 
-        const lastTime = m.lastProbedAt ? new Date(m.lastProbedAt).getTime() : 0;
+        const lastTime = m.lastProbedAt
+          ? new Date(m.lastProbedAt).getTime()
+          : 0;
         const elapsedSec = (now - lastTime) / 1000;
         const interval = m.intervalSec || 10;
 
@@ -137,11 +144,21 @@ export class MonitorsService implements OnApplicationBootstrap {
               where: { id: m.id },
               data: { lastProbedAt: new Date(now) },
             })
-            .catch((err) => this.logger.error(`Failed to update lastProbedAt for ${m.id}`, err));
+            .catch((err) =>
+              this.logger.error(
+                `Failed to update lastProbedAt for ${m.id}`,
+                err,
+              ),
+            );
 
           // Run probe asynchronously so it NEVER blocks other monitors or future ticks!
           this.probeSingleMonitor(m)
-            .catch((err) => this.logger.error(`Error probing monitor ${m.name} (${m.id})`, err))
+            .catch((err) =>
+              this.logger.error(
+                `Error probing monitor ${m.name} (${m.id})`,
+                err,
+              ),
+            )
             .finally(() => {
               this.activeProbes.delete(m.id);
             });
@@ -168,7 +185,10 @@ export class MonitorsService implements OnApplicationBootstrap {
     });
 
     // 2. Update Status Monitor and calculate uptime %
-    const updatedMonitor = await this.updateMonitorStatus(monitor.id, result.status);
+    const updatedMonitor = await this.updateMonitorStatus(
+      monitor.id,
+      result.status,
+    );
 
     // 3. PUSH REALTIME WEBSOCKET WITH UPTIME %
     this.eventsGateway.broadcastMonitorHeartbeat({
@@ -188,17 +208,26 @@ export class MonitorsService implements OnApplicationBootstrap {
   private async handleIncidentTransitions(
     monitor: Monitor,
     prevStatus: MonitorStatus,
-    result: { status: MonitorStatus; latencyMs: number; statusCode?: number; errorMessage?: string },
+    result: {
+      status: MonitorStatus;
+      latencyMs: number;
+      statusCode?: number;
+      errorMessage?: string;
+    },
   ) {
     // KASUS 1: Status berubah menjadi DOWN (Buka Incident Baru)
-    if (result.status === MonitorStatus.DOWN && prevStatus !== MonitorStatus.DOWN) {
+    if (
+      result.status === MonitorStatus.DOWN &&
+      prevStatus !== MonitorStatus.DOWN
+    ) {
       this.logger.warn(`Service DOWN detected: ${monitor.name}`);
 
       const incident = await this.prisma.incident.create({
         data: {
           monitorId: monitor.id,
           title: `Service Down: ${monitor.name}`,
-          description: result.errorMessage || `HTTP Status: ${result.statusCode}`,
+          description:
+            result.errorMessage || `HTTP Status: ${result.statusCode}`,
           status: IncidentStatus.INVESTIGATING,
           updates: {
             create: {
@@ -220,7 +249,10 @@ export class MonitorsService implements OnApplicationBootstrap {
     }
 
     // KASUS 2: Status pulih kembali ke UP dari DOWN (Resolve Incident)
-    else if (result.status === MonitorStatus.UP && prevStatus === MonitorStatus.DOWN) {
+    else if (
+      result.status === MonitorStatus.UP &&
+      prevStatus === MonitorStatus.DOWN
+    ) {
       this.logger.log(`Service RECOVERED: ${monitor.name}`);
 
       // Cari insiden aktif terakhir yang belum selesai
@@ -267,7 +299,10 @@ export class MonitorsService implements OnApplicationBootstrap {
     }
   }
 
-  private async updateMonitorStatus(monitorId: string, currentStatus: MonitorStatus) {
+  private async updateMonitorStatus(
+    monitorId: string,
+    currentStatus: MonitorStatus,
+  ) {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const [totalHeartbeats, upHeartbeats] = await Promise.all([

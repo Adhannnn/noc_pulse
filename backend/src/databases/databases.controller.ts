@@ -12,7 +12,18 @@ export class DatabasesController {
   }
 
   @Post()
-  create(@Body() body: { name: string; engine: string; host: string; port: number; database: string; username: string; password?: string }) {
+  create(
+    @Body()
+    body: {
+      name: string;
+      engine: string;
+      host: string;
+      port: number;
+      database: string;
+      username: string;
+      password?: string;
+    },
+  ) {
     return this.databasesService.create(body);
   }
 

@@ -1,5 +1,10 @@
 // backend/src/groups/groups.service.ts
-import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -12,9 +17,11 @@ export class GroupsService implements OnModuleInit {
     // Seed default group if database has no groups yet
     const count = await this.prisma.serviceGroup.count();
     if (count === 0) {
-      await this.prisma.serviceGroup.create({
-        data: { name: 'Home DC' },
-      }).catch(() => {});
+      await this.prisma.serviceGroup
+        .create({
+          data: { name: 'Home DC' },
+        })
+        .catch(() => {});
     }
   }
 
@@ -25,7 +32,9 @@ export class GroupsService implements OnModuleInit {
   }
 
   async create(name: string) {
-    const existing = await this.prisma.serviceGroup.findUnique({ where: { name } });
+    const existing = await this.prisma.serviceGroup.findUnique({
+      where: { name },
+    });
     if (existing) {
       throw new ConflictException(`Group '${name}' already exists`);
     }
