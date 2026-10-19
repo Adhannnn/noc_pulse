@@ -17,9 +17,24 @@ export class BackupsService implements OnModuleInit {
     if (count === 0) {
       await this.prisma.backupRecord.createMany({
         data: [
-          { deviceName: 'MikroTik Core Router (CCR2004)', filename: 'ccr2004-export-2026-08-25.rsc', sizeKb: 1420, status: 'SUCCESS' },
-          { deviceName: 'PostgreSQL Primary DB Cluster', filename: 'pg-dump-pulsenoc-2026-08-25.sql.gz', sizeKb: 45800, status: 'SUCCESS' },
-          { deviceName: 'Redis Session Cache Cluster', filename: 'redis-dump-2026-08-25.rdb', sizeKb: 3200, status: 'SUCCESS' },
+          {
+            deviceName: 'MikroTik Core Router (CCR2004)',
+            filename: 'ccr2004-export-2026-08-25.rsc',
+            sizeKb: 1420,
+            status: 'SUCCESS',
+          },
+          {
+            deviceName: 'PostgreSQL Primary DB Cluster',
+            filename: 'pg-dump-pulsenoc-2026-08-25.sql.gz',
+            sizeKb: 45800,
+            status: 'SUCCESS',
+          },
+          {
+            deviceName: 'Redis Session Cache Cluster',
+            filename: 'redis-dump-2026-08-25.rdb',
+            sizeKb: 3200,
+            status: 'SUCCESS',
+          },
         ],
       });
       this.logger.log('Seeded default MT Backup records');

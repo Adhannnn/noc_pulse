@@ -12,7 +12,9 @@ export class DataCentersController {
   }
 
   @Post()
-  create(@Body() body: { name: string; location?: string; description?: string }) {
+  create(
+    @Body() body: { name: string; location?: string; description?: string },
+  ) {
     return this.dataCentersService.create(body);
   }
 

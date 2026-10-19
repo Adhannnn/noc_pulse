@@ -12,7 +12,16 @@ export class IpManagementController {
   }
 
   @Post()
-  create(@Body() body: { ip: string; subnet?: string; hostname?: string; status?: string; assignedTo?: string }) {
+  create(
+    @Body()
+    body: {
+      ip: string;
+      subnet?: string;
+      hostname?: string;
+      status?: string;
+      assignedTo?: string;
+    },
+  ) {
     return this.ipService.create(body);
   }
 

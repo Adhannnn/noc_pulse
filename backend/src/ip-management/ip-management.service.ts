@@ -17,12 +17,54 @@ export class IpManagementService implements OnModuleInit {
     if (count === 0) {
       await this.prisma.ipAddress.createMany({
         data: [
-          { ip: '192.168.203.1', subnet: '192.168.203.0/24', hostname: 'gateway.pulsenoc.local', status: 'GATEWAY', assignedTo: 'Core Gateway Router', lastPingMs: 1 },
-          { ip: '192.168.203.151', subnet: '192.168.203.0/24', hostname: 'dashboard.pulsenoc.local', status: 'ACTIVE', assignedTo: 'NOC Master Dashboard', lastPingMs: 2 },
-          { ip: '192.168.203.152', subnet: '192.168.203.0/24', hostname: 'db-master.pulsenoc.local', status: 'ACTIVE', assignedTo: 'PostgreSQL Primary Cluster', lastPingMs: 4 },
-          { ip: '192.168.203.153', subnet: '192.168.203.0/24', hostname: 'redis-cache.pulsenoc.local', status: 'ACTIVE', assignedTo: 'Redis Session Cache', lastPingMs: 2 },
-          { ip: '192.168.203.154', subnet: '192.168.203.0/24', hostname: 'k8s-node-01.pulsenoc.local', status: 'ACTIVE', assignedTo: 'K8s Worker Node 01', lastPingMs: 6 },
-          { ip: '192.168.203.200', subnet: '192.168.203.0/24', hostname: undefined, status: 'AVAILABLE', assignedTo: undefined, lastPingMs: undefined },
+          {
+            ip: '192.168.203.1',
+            subnet: '192.168.203.0/24',
+            hostname: 'gateway.pulsenoc.local',
+            status: 'GATEWAY',
+            assignedTo: 'Core Gateway Router',
+            lastPingMs: 1,
+          },
+          {
+            ip: '192.168.203.151',
+            subnet: '192.168.203.0/24',
+            hostname: 'dashboard.pulsenoc.local',
+            status: 'ACTIVE',
+            assignedTo: 'NOC Master Dashboard',
+            lastPingMs: 2,
+          },
+          {
+            ip: '192.168.203.152',
+            subnet: '192.168.203.0/24',
+            hostname: 'db-master.pulsenoc.local',
+            status: 'ACTIVE',
+            assignedTo: 'PostgreSQL Primary Cluster',
+            lastPingMs: 4,
+          },
+          {
+            ip: '192.168.203.153',
+            subnet: '192.168.203.0/24',
+            hostname: 'redis-cache.pulsenoc.local',
+            status: 'ACTIVE',
+            assignedTo: 'Redis Session Cache',
+            lastPingMs: 2,
+          },
+          {
+            ip: '192.168.203.154',
+            subnet: '192.168.203.0/24',
+            hostname: 'k8s-node-01.pulsenoc.local',
+            status: 'ACTIVE',
+            assignedTo: 'K8s Worker Node 01',
+            lastPingMs: 6,
+          },
+          {
+            ip: '192.168.203.200',
+            subnet: '192.168.203.0/24',
+            hostname: undefined,
+            status: 'AVAILABLE',
+            assignedTo: undefined,
+            lastPingMs: undefined,
+          },
         ],
       });
       this.logger.log('Seeded default IP Management pool (192.168.203.0/24)');
@@ -35,7 +77,13 @@ export class IpManagementService implements OnModuleInit {
     });
   }
 
-  async create(data: { ip: string; subnet?: string; hostname?: string; status?: string; assignedTo?: string }) {
+  async create(data: {
+    ip: string;
+    subnet?: string;
+    hostname?: string;
+    status?: string;
+    assignedTo?: string;
+  }) {
     return this.prisma.ipAddress.create({
       data,
     });

@@ -22,11 +22,18 @@ export class SshGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('ssh:connect')
-  async handleConnect(
+  handleConnect(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { host: string; port?: number; username: string; password?: string; privateKey?: string },
+    @MessageBody()
+    payload: {
+      host: string;
+      port?: number;
+      username: string;
+      password?: string;
+      privateKey?: string;
+    },
   ) {
-    await this.sshService.connect(client, payload);
+    this.sshService.connect(client, payload);
   }
 
   @SubscribeMessage('ssh:input')
@@ -42,7 +49,11 @@ export class SshGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { cols: number; rows: number },
   ) {
-    this.sshService.resizeTerminal(client.id, payload.cols || 120, payload.rows || 35);
+    this.sshService.resizeTerminal(
+      client.id,
+      payload.cols || 120,
+      payload.rows || 35,
+    );
   }
 
   @SubscribeMessage('ssh:disconnect')

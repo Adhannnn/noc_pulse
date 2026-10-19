@@ -14,7 +14,16 @@ export class SshService {
   private readonly logger = new Logger(SshService.name);
   private sessions = new Map<string, SshSession>();
 
-  async connect(socket: Socket, config: { host: string; port?: number; username: string; password?: string; privateKey?: string }) {
+  connect(
+    socket: Socket,
+    config: {
+      host: string;
+      port?: number;
+      username: string;
+      password?: string;
+      privateKey?: string;
+    },
+  ) {
     this.disconnect(socket.id);
 
     const ssh = new SshClient();
@@ -35,8 +44,14 @@ export class SshService {
     }
 
     ssh.on('ready', () => {
-      this.logger.log(`SSH Connection Ready for client [${socket.id}] to [${config.username}@${config.host}:${port}]`);
-      socket.emit('ssh:status', { status: 'CONNECTED', host: config.host, username: config.username });
+      this.logger.log(
+        `SSH Connection Ready for client [${socket.id}] to [${config.username}@${config.host}:${port}]`,
+      );
+      socket.emit('ssh:status', {
+        status: 'CONNECTED',
+        host: config.host,
+        username: config.username,
+      });
 
       ssh.shell(
         {
@@ -46,13 +61,22 @@ export class SshService {
         },
         (err, stream) => {
           if (err) {
-            this.logger.error(`SSH Shell Error for [${socket.id}]: ${err.message}`);
-            socket.emit('ssh:status', { status: 'ERROR', message: `Shell error: ${err.message}` });
+            this.logger.error(
+              `SSH Shell Error for [${socket.id}]: ${err.message}`,
+            );
+            socket.emit('ssh:status', {
+              status: 'ERROR',
+              message: `Shell error: ${err.message}`,
+            });
             ssh.end();
             return;
           }
 
-          this.sessions.set(socket.id, { client: ssh, stream, socketId: socket.id });
+          this.sessions.set(socket.id, {
+            client: ssh,
+            stream,
+            socketId: socket.id,
+          });
 
           stream.on('data', (data: Buffer) => {
             socket.emit('ssh:data', data.toString('utf-8'));
@@ -64,7 +88,10 @@ export class SshService {
 
           stream.on('close', () => {
             this.logger.log(`SSH Stream Closed for client [${socket.id}]`);
-            socket.emit('ssh:status', { status: 'DISCONNECTED', message: 'SSH Shell session closed' });
+            socket.emit('ssh:status', {
+              status: 'DISCONNECTED',
+              message: 'SSH Shell session closed',
+            });
             this.sessions.delete(socket.id);
             ssh.end();
           });
@@ -73,20 +100,31 @@ export class SshService {
     });
 
     ssh.on('error', (err) => {
-      this.logger.error(`SSH Connection Error for [${socket.id}]: ${err.message}`);
-      socket.emit('ssh:status', { status: 'ERROR', message: err.message || 'Authentication failed or host unreachable' });
+      this.logger.error(
+        `SSH Connection Error for [${socket.id}]: ${err.message}`,
+      );
+      socket.emit('ssh:status', {
+        status: 'ERROR',
+        message: err.message || 'Authentication failed or host unreachable',
+      });
       this.sessions.delete(socket.id);
     });
 
     ssh.on('close', () => {
-      socket.emit('ssh:status', { status: 'DISCONNECTED', message: 'SSH connection closed' });
+      socket.emit('ssh:status', {
+        status: 'DISCONNECTED',
+        message: 'SSH connection closed',
+      });
       this.sessions.delete(socket.id);
     });
 
     try {
       ssh.connect(connectOptions);
     } catch (err: any) {
-      socket.emit('ssh:status', { status: 'ERROR', message: `Failed to initiate SSH: ${err.message}` });
+      socket.emit('ssh:status', {
+        status: 'ERROR',
+        message: `Failed to initiate SSH: ${err.message}`,
+      });
     }
   }
 
@@ -99,7 +137,11 @@ export class SshService {
 
   resizeTerminal(socketId: string, cols: number, rows: number) {
     const session = this.sessions.get(socketId);
-    if (session && session.stream && typeof session.stream.setWindow === 'function') {
+    if (
+      session &&
+      session.stream &&
+      typeof session.stream.setWindow === 'function'
+    ) {
       session.stream.setWindow(rows, cols, 0, 0);
     }
   }

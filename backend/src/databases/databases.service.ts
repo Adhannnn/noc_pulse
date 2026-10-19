@@ -25,7 +25,9 @@ export class DatabasesService implements OnModuleInit {
       const dbUrl = process.env.DATABASE_URL;
       if (dbUrl) {
         try {
-          const match = dbUrl.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/);
+          const match = dbUrl.match(
+            /postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/,
+          );
           if (match) {
             username = match[1];
             host = match[3];
@@ -50,12 +52,18 @@ export class DatabasesService implements OnModuleInit {
           connections: 15,
         },
       });
-      this.logger.log(`Seeded dynamic database connection [${database}] on ${host}:${port}`);
+      this.logger.log(
+        `Seeded dynamic database connection [${database}] on ${host}:${port}`,
+      );
     }
   }
 
-  private async getClientForDb(id: string): Promise<{ client: Client | null; dbName: string }> {
-    const db = await this.prisma.databaseConnection.findUnique({ where: { id } });
+  private async getClientForDb(
+    id: string,
+  ): Promise<{ client: Client | null; dbName: string }> {
+    const db = await this.prisma.databaseConnection.findUnique({
+      where: { id },
+    });
     if (!db) return { client: null, dbName: 'Database' };
 
     const isNeonOrCloud =
@@ -89,7 +97,9 @@ export class DatabasesService implements OnModuleInit {
       await client.connect();
       return { client, dbName: db.name };
     } catch (err: any) {
-      this.logger.error(`Failed to connect to target DB [${db.name} @ ${db.host}:${db.port}]: ${err.message}`);
+      this.logger.error(
+        `Failed to connect to target DB [${db.name} @ ${db.host}:${db.port}]: ${err.message}`,
+      );
       return { client: null, dbName: db.name };
     }
   }
@@ -100,7 +110,15 @@ export class DatabasesService implements OnModuleInit {
     });
   }
 
-  async create(data: { name: string; engine: string; host: string; port: number; database: string; username: string; password?: string }) {
+  async create(data: {
+    name: string;
+    engine: string;
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password?: string;
+  }) {
     return this.prisma.databaseConnection.create({
       data: {
         ...data,
@@ -171,7 +189,9 @@ export class DatabasesService implements OnModuleInit {
       return res.rows.map((t: any) => t.table_name || t.TABLE_NAME);
     } catch (error: any) {
       await client.end().catch(() => {});
-      this.logger.error(`Failed to fetch tables from target DB: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch tables from target DB: ${error.message}`,
+      );
       return [];
     }
   }
@@ -179,7 +199,10 @@ export class DatabasesService implements OnModuleInit {
   // Get real table data dynamically from target database
   async getTableData(id: string, tableName: string) {
     const cleanTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
-    const res = await this.executeQuery(id, `SELECT * FROM "${cleanTableName}" LIMIT 50;`);
+    const res = await this.executeQuery(
+      id,
+      `SELECT * FROM "${cleanTableName}" LIMIT 50;`,
+    );
 
     if (res.rows.length === 0) {
       const { client } = await this.getClientForDb(id);
@@ -190,7 +213,9 @@ export class DatabasesService implements OnModuleInit {
           );
           await client.end().catch(() => {});
           if (rawColsRes.rows && rawColsRes.rows.length > 0) {
-            res.columns = rawColsRes.rows.map((c: any) => c.column_name || c.COLUMN_NAME);
+            res.columns = rawColsRes.rows.map(
+              (c: any) => c.column_name || c.COLUMN_NAME,
+            );
           }
         } catch (_) {
           await client.end().catch(() => {});
@@ -220,14 +245,29 @@ export class DatabasesService implements OnModuleInit {
         const durationMs = Date.now() - startTime;
         const rows: any[] = Array.isArray(rawResult) ? rawResult : [rawResult];
         const serializedRows = rows.map((r) => this.serializeRow(r));
-        const columns = serializedRows.length > 0 ? Object.keys(serializedRows[0]) : ['result'];
-        return { dbName, query, columns, rows: serializedRows, rowCount: serializedRows.length, durationMs };
+        const columns =
+          serializedRows.length > 0
+            ? Object.keys(serializedRows[0])
+            : ['result'];
+        return {
+          dbName,
+          query,
+          columns,
+          rows: serializedRows,
+          rowCount: serializedRows.length,
+          durationMs,
+        };
       } catch (err: any) {
         return {
           dbName,
           query,
           columns: ['error_status', 'error_message'],
-          rows: [{ error_status: 'SQL EXECUTION FAILURE', error_message: err.message }],
+          rows: [
+            {
+              error_status: 'SQL EXECUTION FAILURE',
+              error_message: err.message,
+            },
+          ],
           rowCount: 0,
           durationMs: Date.now() - startTime,
         };
@@ -244,8 +284,8 @@ export class DatabasesService implements OnModuleInit {
         serializedRows.length > 0
           ? Object.keys(serializedRows[0])
           : res.fields
-          ? res.fields.map((f) => f.name)
-          : ['result'];
+            ? res.fields.map((f) => f.name)
+            : ['result'];
 
       return {
         dbName,
@@ -265,7 +305,8 @@ export class DatabasesService implements OnModuleInit {
         rows: [
           {
             error_status: 'SQL EXECUTION FAILURE',
-            error_message: error.message || 'Syntax error or table does not exist',
+            error_message:
+              error.message || 'Syntax error or table does not exist',
           },
         ],
         rowCount: 0,

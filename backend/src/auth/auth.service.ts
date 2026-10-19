@@ -1,5 +1,11 @@
 // backend/src/auth/auth.service.ts
-import { ConflictException, Injectable, Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -25,7 +31,8 @@ export class AuthService implements OnModuleInit {
     try {
       const userCount = await this.prisma.user.count();
       if (userCount === 0) {
-        const defaultAdminEmail = process.env.ADMIN_EMAIL || 'admin@pulsenoc.local';
+        const defaultAdminEmail =
+          process.env.ADMIN_EMAIL || 'admin@pulsenoc.local';
         const defaultAdminPass = process.env.ADMIN_PASSWORD || 'admin123456';
         const hashedPassword = await bcrypt.hash(defaultAdminPass, 10);
 
@@ -38,11 +45,15 @@ export class AuthService implements OnModuleInit {
           },
         });
 
-        this.logger.log(`=======================================================`);
+        this.logger.log(
+          `=======================================================`,
+        );
         this.logger.log(`INITIAL ADMIN SEEDED SUCCESSFULLY!`);
         this.logger.log(`Email:    ${defaultAdminEmail}`);
         this.logger.log(`Password: ${defaultAdminPass}`);
-        this.logger.log(`=======================================================`);
+        this.logger.log(
+          `=======================================================`,
+        );
       }
     } catch (error) {
       this.logger.error('Failed to seed initial admin', error);
@@ -104,7 +115,9 @@ export class AuthService implements OnModuleInit {
     });
 
     if (existing) {
-      throw new ConflictException(`User with email ${dto.email} already exists`);
+      throw new ConflictException(
+        `User with email ${dto.email} already exists`,
+      );
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -140,7 +153,9 @@ export class AuthService implements OnModuleInit {
         where: { role: UserRole.ADMIN },
       });
       if (adminCount <= 1) {
-        throw new ConflictException('Cannot change role of the last remaining Admin account');
+        throw new ConflictException(
+          'Cannot change role of the last remaining Admin account',
+        );
       }
     }
 
@@ -168,7 +183,9 @@ export class AuthService implements OnModuleInit {
     });
 
     if (user.role === UserRole.ADMIN && adminCount <= 1) {
-      throw new ConflictException('Cannot delete the last remaining Admin account');
+      throw new ConflictException(
+        'Cannot delete the last remaining Admin account',
+      );
     }
 
     return this.prisma.user.delete({

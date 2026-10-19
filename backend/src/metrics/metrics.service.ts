@@ -31,13 +31,13 @@ export class MetricsService {
   private getMemoryStats(mem: si.Systeminformation.MemData) {
     // Fallback awal kalau /proc/meminfo host gagal dibaca sama sekali
     let totalBytes = mem.total;
-    let usedBytes = mem.active || (mem.total - mem.available) || mem.used;
+    let usedBytes = mem.active || mem.total - mem.available || mem.used;
 
     const targetPath = fs.existsSync('/host/proc/meminfo')
       ? '/host/proc/meminfo'
       : fs.existsSync('/proc/meminfo')
-      ? '/proc/meminfo'
-      : null;
+        ? '/proc/meminfo'
+        : null;
 
     if (targetPath) {
       try {
@@ -64,14 +64,17 @@ export class MetricsService {
 
         if (memTotalKb > 0) {
           totalBytes = memTotalKb * 1024;
-          const availableKb = memAvailableKb || (memFreeKb + buffersKb + cachedKb);
+          const availableKb =
+            memAvailableKb || memFreeKb + buffersKb + cachedKb;
           usedBytes = (memTotalKb - availableKb) * 1024;
         }
       } catch (err) {
         this.logger.warn(`Failed to parse ${targetPath}: ${err}`);
       }
     } else {
-      this.logger.warn('Host /proc/meminfo not accessible, falling back to container-view memory stats');
+      this.logger.warn(
+        'Host /proc/meminfo not accessible, falling back to container-view memory stats',
+      );
     }
 
     // Guard basic saja (data korup/negatif), bukan tempat nyuntik angka palsu
@@ -98,8 +101,8 @@ export class MetricsService {
     const targetPath = fs.existsSync('/host/proc/meminfo')
       ? '/host/proc/meminfo'
       : fs.existsSync('/proc/meminfo')
-      ? '/proc/meminfo'
-      : null;
+        ? '/proc/meminfo'
+        : null;
 
     if (targetPath) {
       try {
@@ -116,30 +119,45 @@ export class MetricsService {
             if (key === 'Buffers') buffersBytes = val;
             if (key === 'Cached') cachedBytes = val;
             if (key === 'SwapTotal') swapTotalBytes = val;
-            if (key === 'SwapFree') swapUsedBytes = Math.max(0, swapTotalBytes - val);
+            if (key === 'SwapFree')
+              swapUsedBytes = Math.max(0, swapTotalBytes - val);
           }
         });
       } catch (_) {}
     }
 
-    const available = availableBytes || (freeBytes + buffersBytes + cachedBytes);
+    const available = availableBytes || freeBytes + buffersBytes + cachedBytes;
     const usedBytes = Math.max(0, totalBytes - available);
     const activeBytes = Math.max(0, usedBytes - buffersBytes - cachedBytes);
 
     return {
-      totalGb: Number((totalBytes / (1024 ** 3)).toFixed(2)),
-      usedGb: Number((usedBytes / (1024 ** 3)).toFixed(2)),
-      availableGb: Number((available / (1024 ** 3)).toFixed(2)),
-      freeGb: Number((freeBytes / (1024 ** 3)).toFixed(2)),
-      activeGb: Number((activeBytes / (1024 ** 3)).toFixed(2)),
-      buffersMb: Number((buffersBytes / (1024 ** 2)).toFixed(2)),
-      cachedMb: Number((cachedBytes / (1024 ** 2)).toFixed(2)),
-      swapTotalGb: Number((swapTotalBytes / (1024 ** 3)).toFixed(2)),
-      swapUsedGb: Number((swapUsedBytes / (1024 ** 3)).toFixed(2)),
-      usedPct: totalBytes > 0 ? Number(((usedBytes / totalBytes) * 100).toFixed(1)) : 0,
-      activePct: totalBytes > 0 ? Number(((activeBytes / totalBytes) * 100).toFixed(1)) : 0,
-      cachedPct: totalBytes > 0 ? Number((((buffersBytes + cachedBytes) / totalBytes) * 100).toFixed(1)) : 0,
-      freePct: totalBytes > 0 ? Number(((freeBytes / totalBytes) * 100).toFixed(1)) : 0,
+      totalGb: Number((totalBytes / 1024 ** 3).toFixed(2)),
+      usedGb: Number((usedBytes / 1024 ** 3).toFixed(2)),
+      availableGb: Number((available / 1024 ** 3).toFixed(2)),
+      freeGb: Number((freeBytes / 1024 ** 3).toFixed(2)),
+      activeGb: Number((activeBytes / 1024 ** 3).toFixed(2)),
+      buffersMb: Number((buffersBytes / 1024 ** 2).toFixed(2)),
+      cachedMb: Number((cachedBytes / 1024 ** 2).toFixed(2)),
+      swapTotalGb: Number((swapTotalBytes / 1024 ** 3).toFixed(2)),
+      swapUsedGb: Number((swapUsedBytes / 1024 ** 3).toFixed(2)),
+      usedPct:
+        totalBytes > 0
+          ? Number(((usedBytes / totalBytes) * 100).toFixed(1))
+          : 0,
+      activePct:
+        totalBytes > 0
+          ? Number(((activeBytes / totalBytes) * 100).toFixed(1))
+          : 0,
+      cachedPct:
+        totalBytes > 0
+          ? Number(
+              (((buffersBytes + cachedBytes) / totalBytes) * 100).toFixed(1),
+            )
+          : 0,
+      freePct:
+        totalBytes > 0
+          ? Number(((freeBytes / totalBytes) * 100).toFixed(1))
+          : 0,
     };
   }
 
@@ -165,7 +183,10 @@ export class MetricsService {
         diskUsagePct: Number(((usedBytes / totalBytes) * 100).toFixed(2)),
       };
     } catch (error) {
-      this.logger.error('Failed to read host disk stats from /host/root', error as Error);
+      this.logger.error(
+        'Failed to read host disk stats from /host/root',
+        error as Error,
+      );
       return { diskTotalGb: 0, diskUsedGb: 0, diskUsagePct: 0 };
     }
   }
@@ -244,10 +265,10 @@ export class MetricsService {
   // REST API untuk mengambil telemetry informasi server/OS
   async getServerInfo() {
     try {
-      const [osInfo, cpu, time, netInterfaces] = await Promise.all([
+      const time = si.time();
+      const [osInfo, cpu, netInterfaces] = await Promise.all([
         si.osInfo(),
         si.cpu(),
-        si.time(),
         si.networkInterfaces(),
       ]);
 
@@ -264,9 +285,13 @@ export class MetricsService {
       let realHostname = osInfo.hostname || 'unknown-host';
       try {
         if (fs.existsSync('/host/proc/sys/kernel/hostname')) {
-          realHostname = fs.readFileSync('/host/proc/sys/kernel/hostname', 'utf-8').trim();
+          realHostname = fs
+            .readFileSync('/host/proc/sys/kernel/hostname', 'utf-8')
+            .trim();
         } else if (fs.existsSync('/proc/sys/kernel/hostname')) {
-          realHostname = fs.readFileSync('/proc/sys/kernel/hostname', 'utf-8').trim();
+          realHostname = fs
+            .readFileSync('/proc/sys/kernel/hostname', 'utf-8')
+            .trim();
         }
       } catch (err) {
         this.logger.warn(`Failed to read host hostname: ${err}`);

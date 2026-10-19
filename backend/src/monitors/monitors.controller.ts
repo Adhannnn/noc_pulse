@@ -1,5 +1,14 @@
 // backend/src/monitors/monitors.controller.ts
-import { Body, Controller, Delete, Get, Param, Post, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { MonitorsService } from './monitors.service';
 import { CreateMonitorDto } from './dto/create-monitor.dto';
 
@@ -24,7 +33,10 @@ export class MonitorsController {
   }
 
   @Post('groups/rename')
-  renameGroup(@Body('oldName') oldName: string, @Body('newName') newName: string) {
+  renameGroup(
+    @Body('oldName') oldName: string,
+    @Body('newName') newName: string,
+  ) {
     return this.monitorsService.renameGroup(oldName, newName);
   }
 
