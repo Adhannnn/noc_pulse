@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { getApiBaseUrl } from '@/lib/api-config';
 import { ShieldCheck, Lock, Mail, Radio, AlertCircle, KeyRound, Server } from 'lucide-react';
 
 export default function LoginPage() {
@@ -18,7 +19,8 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/login`, {
+      const baseUrl = getApiBaseUrl();
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -31,8 +33,9 @@ export default function LoginPage() {
       }
 
       login(data.accessToken, data.user);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Authentication failed. Access denied.';
+      setError(message);
     } finally {
       setSubmitting(false);
     }
