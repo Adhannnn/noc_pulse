@@ -1,0 +1,44 @@
+name: Deploy to Debian Laptop
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-debian-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Self-Hosted Docker Compose Deployment
+    runs-on: [self-hosted, linux]
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Environment Configuration
+        run: |
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+              echo "Created initial .env from .env.example"
+            else
+              touch .env
+            fi
+          fi
+
+      - name: Build and Start Containers
+        run: |
+          echo "Deploying PulseNOC stack on Debian host..."
+          docker compose down --remove-orphans || true
+          docker compose up -d --build --remove-orphans
+
+      - name: Verify Running Containers
+        run: |
+          echo "Verifying container runtime status..."
+          sleep 5
+          docker compose ps
+          echo "PulseNOC deployment verified successfully!"

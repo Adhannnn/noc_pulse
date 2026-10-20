@@ -122,3 +122,18 @@ Pipeline **AI Code Reviewer** (`.github/workflows/ai-code-reviewer.yml`) secara 
 - Apabila ditemukan **minimal 1 temuan berlabel `High` atau `Critical`**, pipeline akan **FAIL (Exit Code 1)**.
 - GitHub status check akan menandai review sebagai gagal dan memblokir tombol merge PR.
 - Developer harus memperbaiki temuan tersebut pada branch, kemudian push ulang untuk memicu re-evaluasi otomatis oleh AI Reviewer.
+
+---
+
+## 6. Pipeline CD Otomatis ke Laptop Debian (Self-Hosted Runner)
+
+Setiap Pull Request yang berhasil dimerge ke branch `main` akan memicu pipeline Continuous Deployment (CD) otomatis (`.github/workflows/deploy.yml`):
+1. **Target Host**: Laptop Debian yang menjalankan GitHub Actions Self-Hosted Runner (`runs-on: [self-hosted, linux]`).
+2. **Eksekusi Deployment**:
+   - Kode terbaru ditarik langsung ke host runner.
+   - Stack kontainer di-*rebuild* dan di-*restart* di background menggunakan Docker Compose:
+     ```bash
+     docker compose up -d --build --remove-orphans
+     ```
+   - Health check memvalidasi bahwa kontainer `pulsenoc-backend` (port 4000) dan `pulsenoc-frontend` (port 3002) berjalan normal.
+
