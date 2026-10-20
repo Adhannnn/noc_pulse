@@ -3,6 +3,7 @@
 # ==============================================================================
 # PulseNOC - Local Pipeline Verification Script
 # Verifies checks, tests, builds, and AI reviewer compliance before pushing.
+# Mirrors .github/workflows/pipeline.yml stages locally.
 # ==============================================================================
 
 set -eo pipefail
@@ -31,7 +32,7 @@ if [ "$CURRENT_BRANCH" == "main" ]; then
 fi
 
 # Step 1: Backend checks
-echo -e "\n${BLUE}--- [1/5] Backend: Prisma Generate & Lint ---${NC}"
+echo -e "\n${BLUE}--- [1/7] BE 1. Check & Lint (Prisma & ESLint) ---${NC}"
 cd "$ROOT_DIR/backend"
 npx prisma generate
 npm run lint || {
@@ -41,7 +42,7 @@ npm run lint || {
 echo -e "${GREEN}✓ Backend lint passed.${NC}"
 
 # Step 2: Backend tests
-echo -e "\n${BLUE}--- [2/5] Backend: Unit & Integration Tests ---${NC}"
+echo -e "\n${BLUE}--- [2/7] BE 2. Test Suite (Jest Unit & Integration) ---${NC}"
 npm run test -- --passWithNoTests || {
   echo -e "${RED}❌ Backend tests failed!${NC}"
   exit 1
@@ -49,28 +50,40 @@ npm run test -- --passWithNoTests || {
 echo -e "${GREEN}✓ Backend tests passed.${NC}"
 
 # Step 3: Backend build
-echo -e "\n${BLUE}--- [3/5] Backend: Production Build ---${NC}"
+echo -e "\n${BLUE}--- [3/7] BE 3. Production Build (NestJS Compile) ---${NC}"
 npm run build || {
   echo -e "${RED}❌ Backend build failed!${NC}"
   exit 1
 }
 echo -e "${GREEN}✓ Backend build passed.${NC}"
 
-# Step 4: Frontend checks & build
-echo -e "\n${BLUE}--- [4/5] Frontend: Lint & Production Build ---${NC}"
+# Step 4: Frontend check & lint
+echo -e "\n${BLUE}--- [4/7] FE 1. Check & Lint (ESLint) ---${NC}"
 cd "$ROOT_DIR/frontend"
 npm run lint || {
   echo -e "${RED}❌ Frontend lint failed! Please fix lint issues.${NC}"
   exit 1
 }
+echo -e "${GREEN}✓ Frontend lint passed.${NC}"
+
+# Step 5: Frontend strict type check & test
+echo -e "\n${BLUE}--- [5/7] FE 2. Type Check & Test (TypeScript Strict) ---${NC}"
+npx tsc --noEmit || {
+  echo -e "${RED}❌ Frontend type check failed!${NC}"
+  exit 1
+}
+echo -e "${GREEN}✓ Frontend type check passed.${NC}"
+
+# Step 6: Frontend production build
+echo -e "\n${BLUE}--- [6/7] FE 3. Production Build (Next.js Compile) ---${NC}"
 npm run build || {
   echo -e "${RED}❌ Frontend build failed!${NC}"
   exit 1
 }
-echo -e "${GREEN}✓ Frontend checks & build passed.${NC}"
+echo -e "${GREEN}✓ Frontend production build passed.${NC}"
 
-# Step 5: AI Reviewer dry-run
-echo -e "\n${BLUE}--- [5/5] Anti-Slop & AI Review Gatekeeper ---${NC}"
+# Step 7: AI Reviewer dry-run
+echo -e "\n${BLUE}--- [7/7] Anti-Slop & AI Review Gatekeeper ---${NC}"
 cd "$ROOT_DIR"
 node scripts/ai-reviewer.mjs || {
   echo -e "${RED}❌ AI Reviewer Gatekeeper found blocking issues!${NC}"

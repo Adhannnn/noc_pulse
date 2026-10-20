@@ -86,22 +86,25 @@ Setiap pengerjaan (baik oleh developer maupun AI Assistant Jarvis) wajib mengakt
 
 ---
 
-## 4. Pipeline CI/CD (Checks, Test & Build)
+## 4. Pipeline CI/CD Sekuensial (`pipeline.yml`)
 
-Setiap Pull Request yang masuk akan memicu pipeline **GitHub Actions CI** (`.github/workflows/ci.yml`):
+Pipeline **PulseNOC Pipeline** (`.github/workflows/pipeline.yml`) berjalan secara sekuensial dan terstruktur (`Check` ➔ `Test` ➔ `Build` ➔ `Deploy`):
 
-1. **Linting & Code Style**:
-   - Backend: `npm run lint` (ESLint)
-   - Frontend: `npm run lint` (Next ESLint)
-2. **Type Checking**:
-   - Backend & Frontend: `tsc --noEmit`
-3. **Automated Tests**:
-   - Backend & Frontend: `npm run test` (Jest test suite)
-4. **Production Build**:
-   - Backend: `npm run build` (NestJS build)
-   - Frontend: `npm run build` (Next.js build)
+### Pipeline Backend (BE):
+1. **`BE 1. Check & Lint`**:
+   - `npm run lint` (ESLint) & Prisma schema client generation.
+2. **`BE 2. Test Suite`** *(needs: `BE 1`)*:
+   - `npm run test` (Jest unit & integration test suites).
+3. **`BE 3. Production Build`** *(needs: `BE 2`)*:
+   - `npm run build` (NestJS production compilation).
 
-Jika salah satu tahap gagal, PR tidak dapat di-merge.
+### Pipeline Frontend (FE):
+1. **`FE 1. Check & Lint`**:
+   - `npm run lint` (Next.js ESLint).
+2. **`FE 2. Type Check & Test`** *(needs: `FE 1`)*:
+   - `npx tsc --noEmit` (Strict TypeScript compiler verification).
+3. **`FE 3. Production Build`** *(needs: `FE 2`)*:
+   - `npm run build` (Next.js production bundle compilation).
 
 ---
 
@@ -127,13 +130,15 @@ Pipeline **AI Code Reviewer** (`.github/workflows/ai-code-reviewer.yml`) secara 
 
 ## 6. Pipeline CD Otomatis ke Laptop Debian (Self-Hosted Runner)
 
-Setiap Pull Request yang berhasil dimerge ke branch `main` akan memicu pipeline Continuous Deployment (CD) otomatis (`.github/workflows/deploy.yml`):
-1. **Target Host**: Laptop Debian yang menjalankan GitHub Actions Self-Hosted Runner (`runs-on: [self-hosted, linux]`).
-2. **Eksekusi Deployment**:
-   - Kode terbaru ditarik langsung ke host runner.
-   - Stack kontainer di-*rebuild* dan di-*restart* di background menggunakan Docker Compose:
-     ```bash
-     docker compose up -d --build --remove-orphans
-     ```
-   - Health check memvalidasi bahwa kontainer `pulsenoc-backend` (port 4000) dan `pulsenoc-frontend` (port 3002) berjalan normal.
+Ketika Pull Request berhasil dimerge ke branch `main`, job deployment di `.github/workflows/pipeline.yml` akan aktif secara otomatis setelah tahap build Backend dan Frontend sukses:
+
+- **Nama Job**: `Deploy to Server Laptop` *(needs: `[be-build, fe-build]`)*
+- **Target Host**: Laptop Debian yang menjalankan GitHub Actions Self-Hosted Runner (`runs-on: [self-hosted, linux]`).
+- **Eksekusi Deployment**:
+  - Kode terbaru ditarik langsung ke host runner.
+  - Stack kontainer di-*rebuild* dan di-*restart* di background menggunakan Docker Compose:
+    ```bash
+    docker compose up -d --build --remove-orphans
+    ```
+  - Health check memvalidasi bahwa kontainer `pulsenoc-backend` (port 4000) dan `pulsenoc-frontend` (port 3002) berjalan normal.
 
