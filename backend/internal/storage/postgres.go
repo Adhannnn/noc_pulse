@@ -216,38 +216,37 @@ func (s *PostgresStore) autoMigrate(ctx context.Context) error {
 }
 
 func (s *PostgresStore) seedAdmin(ctx context.Context) error {
-	var count int
-	err := s.pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", "admin@pulsenoc.io").Scan(&count)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
+	defaultAdminEmail := "admin@pulsenoc.local"
+	defaultAdminPass := "admin123456"
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	if err != nil {
-		return err
+	var exists bool
+	err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = LOWER($1))", defaultAdminEmail).Scan(&exists)
+	if err == nil && !exists {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultAdminPass), bcrypt.DefaultCost)
+		if err == nil {
+			id := fmt.Sprintf("usr-%d", time.Now().UnixNano())
+			_, err = s.pool.Exec(ctx, `
+				INSERT INTO users (id, email, name, password, role, "createdAt", "updatedAt")
+				VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+				ON CONFLICT (email) DO NOTHING
+			`, id, defaultAdminEmail, "PulseNOC Administrator", string(hashedPassword), "ADMIN")
+			if err == nil {
+				log.Printf("[Storage] Default admin user seeded: %s / %s\n", defaultAdminEmail, defaultAdminPass)
+			}
+		}
 	}
-
-	id := fmt.Sprintf("usr-%d", time.Now().UnixNano())
-	_, err = s.pool.Exec(ctx, `
-		INSERT INTO users (id, email, name, password, role, "createdAt", "updatedAt")
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-	`, id, "admin@pulsenoc.io", "PulseNOC Administrator", string(hashedPassword), "ADMIN")
-
-	if err == nil {
-		log.Println("[Storage] Default admin user seeded: admin@pulsenoc.io / admin")
-	}
-	return err
+	return nil
 }
 
 // User Queries
 func (s *PostgresStore) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	if s == nil || s.pool == nil {
+		return nil, fmt.Errorf("storage not connected")
+	}
 	var u models.User
 	row := s.pool.QueryRow(ctx, `
 		SELECT id, email, name, password, role, "createdAt", "updatedAt"
-		FROM users WHERE email = $1
+		FROM users WHERE LOWER(email) = LOWER($1)
 	`, email)
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Password, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {

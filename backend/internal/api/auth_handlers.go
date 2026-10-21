@@ -45,7 +45,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"accessToken":  token,
 		"access_token": token,
+		"token":        token,
 		"user": map[string]interface{}{
 			"id":    user.ID,
 			"email": user.Email,

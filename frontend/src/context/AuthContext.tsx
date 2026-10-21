@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedToken = localStorage.getItem('pulsenoc_token');
     const storedUser = localStorage.getItem('pulsenoc_user');
 
-    if (storedToken && storedUser) {
+    if (storedToken && storedUser && storedToken !== 'undefined' && storedToken !== 'null') {
       try {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
@@ -42,6 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('pulsenoc_token');
         localStorage.removeItem('pulsenoc_user');
       }
+    } else {
+      localStorage.removeItem('pulsenoc_token');
+      localStorage.removeItem('pulsenoc_user');
     }
     setLoading(false);
   }, []);
