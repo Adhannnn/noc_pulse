@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,11 +16,33 @@ type PostgresStore struct {
 	pool *pgxpool.Pool
 }
 
+func sanitizePostgresURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	q := u.Query()
+	// Strip Prisma-specific ?schema= parameter (unrecognized by PostgreSQL server)
+	if schema := q.Get("schema"); schema != "" {
+		q.Del("schema")
+		if q.Get("search_path") == "" {
+			q.Set("search_path", schema)
+		}
+	}
+	// Default to sslmode=disable if not specified for local/internal connections
+	if q.Get("sslmode") == "" {
+		q.Set("sslmode", "disable")
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 func NewPostgresStore(dbURL string) (*PostgresStore, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	config, err := pgxpool.ParseConfig(dbURL)
+	cleanedURL := sanitizePostgresURL(dbURL)
+	config, err := pgxpool.ParseConfig(cleanedURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database url: %w", err)
 	}
@@ -287,6 +310,9 @@ func (s *PostgresStore) DeleteUser(ctx context.Context, id string) error {
 
 // Host Metrics Queries
 func (s *PostgresStore) SaveHostMetric(ctx context.Context, m *models.HostMetric) error {
+	if s == nil || s.pool == nil {
+		return fmt.Errorf("storage not connected")
+	}
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO host_metrics (
 			id, "cpuUsage", "ramUsedMb", "ramTotalMb", "diskUsagePct",
@@ -300,6 +326,9 @@ func (s *PostgresStore) SaveHostMetric(ctx context.Context, m *models.HostMetric
 }
 
 func (s *PostgresStore) GetHostMetricsHistory(ctx context.Context, limit int) ([]models.HostMetric, error) {
+	if s == nil || s.pool == nil {
+		return []models.HostMetric{}, nil
+	}
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}

@@ -63,9 +63,11 @@ func (c *HardwareCollector) Start(ctx context.Context) {
 				continue
 			}
 			// Persist to PostgreSQL every 30s for historical telemetry charts
-			saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_ = c.store.SaveHostMetric(saveCtx, metric)
-			cancel()
+			if c.store != nil {
+				saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = c.store.SaveHostMetric(saveCtx, metric)
+				cancel()
+			}
 		}
 	}
 }
