@@ -18,6 +18,9 @@ import {
   AlertTriangle,
   Search,
   RefreshCw,
+  ShieldCheck,
+  Lock,
+  Network,
 } from 'lucide-react';
 
 interface Props {
@@ -26,7 +29,7 @@ interface Props {
 }
 
 export default function ServiceDetailView({ monitor, onBack }: Props) {
-  const [activeTab, setActiveTab] = useState<'LOGS' | 'TELEMETRY' | 'CONFIG'>('LOGS');
+  const [activeTab, setActiveTab] = useState<'LOGS' | 'WATERFALL' | 'TELEMETRY' | 'CONFIG'>('WATERFALL');
   const [logSearch, setLogSearch] = useState('');
 
   // Config Edit States
@@ -137,6 +140,16 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
 
         {/* Tab Buttons */}
         <div className="flex items-center bg-[#090C16] p-1 rounded-xl border border-[#1E2640] text-xs">
+          <button
+            onClick={() => setActiveTab('WATERFALL')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold transition ${
+              activeTab === 'WATERFALL'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" /> NOC Waterfall & SSL
+          </button>
           <button
             onClick={() => setActiveTab('LOGS')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold transition ${
@@ -293,6 +306,125 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: NOC WATERFALL & SSL */}
+      {activeTab === 'WATERFALL' && (
+        <div className="space-y-6">
+          {/* Waterfall Network Breakdown */}
+          <div className="bg-[#121829] border border-[#1E2640] rounded-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[#1E2640] pb-4">
+              <div className="flex items-center gap-2">
+                <Network className="w-4 h-4 text-sky-400" />
+                <h3 className="font-bold text-slate-100 text-sm font-mono uppercase tracking-wider">
+                  Network Timing Breakdown (cURL-Style Waterfall)
+                </h3>
+              </div>
+              <span className="text-xs font-mono text-slate-400">
+                Total Latency: <span className="text-sky-400 font-bold">{monitor.timing?.totalMs ?? latestLatency} ms</span>
+              </span>
+            </div>
+
+            {/* Waterfall Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                <div className="text-[10px] font-mono text-slate-400 uppercase">DNS Lookup</div>
+                <div className="text-base font-bold font-mono text-emerald-400 mt-1">
+                  {monitor.timing?.dnsLookupMs ?? 0} ms
+                </div>
+              </div>
+              <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                <div className="text-[10px] font-mono text-slate-400 uppercase">TCP Handshake</div>
+                <div className="text-base font-bold font-mono text-sky-400 mt-1">
+                  {monitor.timing?.tcpHandshakeMs ?? 0} ms
+                </div>
+              </div>
+              <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                <div className="text-[10px] font-mono text-slate-400 uppercase">TLS Handshake</div>
+                <div className="text-base font-bold font-mono text-indigo-400 mt-1">
+                  {monitor.timing?.tlsHandshakeMs ?? 0} ms
+                </div>
+              </div>
+              <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                <div className="text-[10px] font-mono text-slate-400 uppercase">TTFB (Server Process)</div>
+                <div className="text-base font-bold font-mono text-amber-400 mt-1">
+                  {monitor.timing?.ttfbMs ?? latestLatency} ms
+                </div>
+              </div>
+              <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                <div className="text-[10px] font-mono text-slate-400 uppercase">Content Transfer</div>
+                <div className="text-base font-bold font-mono text-purple-400 mt-1">
+                  {monitor.timing?.transferMs ?? 0} ms
+                </div>
+              </div>
+            </div>
+
+            {/* Proportional Stacked Progress Bar */}
+            <div className="space-y-1.5 font-mono text-xs">
+              <div className="flex h-3 w-full rounded-full overflow-hidden bg-slate-800">
+                <div style={{ width: `${Math.max(5, ((monitor.timing?.dnsLookupMs ?? 0) / Math.max(1, monitor.timing?.totalMs ?? 1)) * 100)}%` }} className="bg-emerald-500" title="DNS Lookup" />
+                <div style={{ width: `${Math.max(5, ((monitor.timing?.tcpHandshakeMs ?? 0) / Math.max(1, monitor.timing?.totalMs ?? 1)) * 100)}%` }} className="bg-sky-500" title="TCP Handshake" />
+                <div style={{ width: `${Math.max(5, ((monitor.timing?.tlsHandshakeMs ?? 0) / Math.max(1, monitor.timing?.totalMs ?? 1)) * 100)}%` }} className="bg-indigo-500" title="TLS Handshake" />
+                <div style={{ width: `${Math.max(10, ((monitor.timing?.ttfbMs ?? latestLatency) / Math.max(1, monitor.timing?.totalMs ?? 1)) * 100)}%` }} className="bg-amber-500" title="TTFB Server Process" />
+                <div style={{ width: `${Math.max(5, ((monitor.timing?.transferMs ?? 0) / Math.max(1, monitor.timing?.totalMs ?? 1)) * 100)}%` }} className="bg-purple-500" title="Transfer" />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> DNS</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-500" /> TCP</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> TLS</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> TTFB</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500" /> Transfer</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SSL / TLS Certificate Guard */}
+          <div className="bg-[#121829] border border-[#1E2640] rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#1E2640] pb-3">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-bold text-slate-100 text-sm font-mono uppercase tracking-wider">
+                  SSL / TLS Certificate Expiry Guard
+                </h3>
+              </div>
+              {monitor.sslCert && (
+                <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${
+                  monitor.sslCert.daysRemaining > 30
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : monitor.sslCert.daysRemaining > 14
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse'
+                }`}>
+                  {monitor.sslCert.daysRemaining} Days Remaining
+                </span>
+              )}
+            </div>
+
+            {monitor.sslCert ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+                <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                  <div className="text-[10px] text-slate-500 uppercase">Certificate Issuer</div>
+                  <div className="text-slate-200 font-bold mt-1 truncate">{monitor.sslCert.issuer || 'Standard CA'}</div>
+                </div>
+                <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                  <div className="text-[10px] text-slate-500 uppercase">Common Name / Subject</div>
+                  <div className="text-slate-200 font-bold mt-1 truncate">{monitor.sslCert.subject || monitor.url}</div>
+                </div>
+                <div className="bg-[#090C16] border border-[#1E2640] p-3 rounded-xl">
+                  <div className="text-[10px] text-slate-500 uppercase">Expiration Date</div>
+                  <div className="text-slate-200 font-bold mt-1">
+                    {new Date(monitor.sslCert.validTo).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs font-mono text-slate-400 bg-[#090C16] border border-[#1E2640] p-4 rounded-xl flex items-center gap-3">
+                <Clock className="w-4 h-4 text-slate-500" />
+                <span>SSL certificate analysis active. Will update on next precision probe tick.</span>
+              </div>
+            )}
           </div>
         </div>
       )}

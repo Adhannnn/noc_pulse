@@ -32,26 +32,26 @@ if [ "$CURRENT_BRANCH" == "main" ]; then
 fi
 
 # Step 1: Backend checks
-echo -e "\n${BLUE}--- [1/7] BE 1. Check & Lint (Prisma & ESLint) ---${NC}"
+echo -e "\n${BLUE}--- [1/7] BE 1. Check & Lint (Go Vet & Mod Verify) ---${NC}"
 cd "$ROOT_DIR/backend"
-npx prisma generate
-npm run lint || {
-  echo -e "${RED}❌ Backend lint failed! Please fix lint issues.${NC}"
+go mod verify
+go vet ./... || {
+  echo -e "${RED}❌ Backend go vet failed! Please fix issues.${NC}"
   exit 1
 }
-echo -e "${GREEN}✓ Backend lint passed.${NC}"
+echo -e "${GREEN}✓ Backend vet and module verify passed.${NC}"
 
 # Step 2: Backend tests
-echo -e "\n${BLUE}--- [2/7] BE 2. Test Suite (Jest Unit & Integration) ---${NC}"
-npm run test -- --passWithNoTests || {
+echo -e "\n${BLUE}--- [2/7] BE 2. Test Suite (Go Tests) ---${NC}"
+go test -v ./... || {
   echo -e "${RED}❌ Backend tests failed!${NC}"
   exit 1
 }
 echo -e "${GREEN}✓ Backend tests passed.${NC}"
 
 # Step 3: Backend build
-echo -e "\n${BLUE}--- [3/7] BE 3. Production Build (NestJS Compile) ---${NC}"
-npm run build || {
+echo -e "\n${BLUE}--- [3/7] BE 3. Production Build (Golang Compile) ---${NC}"
+go build -o /dev/null ./cmd/server || {
   echo -e "${RED}❌ Backend build failed!${NC}"
   exit 1
 }
