@@ -32,7 +32,12 @@ export default function LoginPage() {
         throw new Error(data.message || 'Authentication failed. Access denied.');
       }
 
-      login(data.accessToken, data.user);
+      const token = data.accessToken || data.access_token || data.token;
+      if (!token) {
+        throw new Error(data.message || data.error || 'Authentication failed: No access token received from server.');
+      }
+
+      login(token, data.user);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Authentication failed. Access denied.';
       setError(message);
