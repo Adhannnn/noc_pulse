@@ -31,7 +31,7 @@ jobs:
       - name: Setup Go Runtime
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'backend/go.mod'
           cache-dependency-path: backend/go.sum
 
       - name: Verify Go Modules
@@ -55,7 +55,7 @@ jobs:
       - name: Setup Go Runtime
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'backend/go.mod'
           cache-dependency-path: backend/go.sum
 
       - name: Run Go Unit & Integration Tests
@@ -76,7 +76,7 @@ jobs:
       - name: Setup Go Runtime
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'backend/go.mod'
           cache-dependency-path: backend/go.sum
 
       - name: Run Golang Production Compile
