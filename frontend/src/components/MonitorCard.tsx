@@ -13,6 +13,25 @@ export interface Heartbeat {
   timestamp: string;
 }
 
+export interface TimingBreakdown {
+  dnsLookupMs: number;
+  tcpHandshakeMs: number;
+  tlsHandshakeMs: number;
+  ttfbMs: number;
+  transferMs: number;
+  totalMs: number;
+}
+
+export interface SSLCertificateInfo {
+  issuer: string;
+  subject: string;
+  validFrom: string;
+  validTo: string;
+  daysRemaining: number;
+  isExpired: boolean;
+  warningTrigger: boolean;
+}
+
 export interface Monitor {
   id: string;
   name: string;
@@ -25,6 +44,8 @@ export interface Monitor {
   currentStatus: 'UP' | 'DOWN' | 'DEGRADED' | 'PENDING';
   uptimePercent24h: number;
   heartbeats: Heartbeat[];
+  timing?: TimingBreakdown;
+  sslCert?: SSLCertificateInfo;
 }
 
 interface Props {

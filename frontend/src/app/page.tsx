@@ -21,6 +21,7 @@ import AlertChannelsView from '@/components/AlertChannelsView';
 import UserManagement from '@/components/UserManagement';
 import MemoryDetailView from '@/components/MemoryDetailView';
 import SshTerminalView from '@/components/SshTerminalView';
+import DockerLogsModal from '@/components/DockerLogsModal';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -35,6 +36,7 @@ import {
   Edit3,
   Trash2,
   FolderPlus,
+  Terminal,
 } from 'lucide-react';
 
 // diskReadKb/diskWriteKb opsional — hanya terisi kalau backend sudah kirim (lihat opsi 2 di bawah)
@@ -49,6 +51,15 @@ interface HostMetric {
   networkOutKb: number;
   diskReadKb?: number;
   diskWriteKb?: number;
+}
+
+interface HeartbeatWsPayload {
+  monitorId: string;
+  status: 'UP' | 'DOWN' | 'DEGRADED';
+  latencyMs: number;
+  statusCode?: number;
+  timestamp: string;
+  uptimePercent24h?: number;
 }
 
 export default function DashboardPage() {
@@ -69,6 +80,7 @@ export default function DashboardPage() {
   const [registeredGroups, setRegisteredGroups] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [showMemoryDetail, setShowMemoryDetail] = useState(false);
+  const [isDockerLogsOpen, setIsDockerLogsOpen] = useState(false);
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -206,7 +218,7 @@ export default function DashboardPage() {
       setDiskWriteHistory((prev) => [...prev.slice(-15), data.diskWriteKb ?? 0]);
     });
 
-    socket.on('monitors:heartbeat', (data) => {
+    socket.on('monitors:heartbeat', (data: HeartbeatWsPayload) => {
       setMonitors((prev) =>
         prev.map((m) => {
           if (m.id === data.monitorId) {
@@ -327,6 +339,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsDockerLogsOpen(true)}
+              className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Docker Logs
+            </button>
+
             {currentTab === 'SERVICES' && (
               <button
                 onClick={() => setIsGroupModalOpen(true)}
@@ -741,6 +760,11 @@ export default function DashboardPage() {
         onConfirm={() => deleteGroupTargetName && confirmDeleteGroup(deleteGroupTargetName)}
         title="Delete Service Group & Assigned Targets"
         description={`Are you sure you want to delete service group "${deleteGroupTargetName}" and all assigned targets? Active monitoring and historical telemetry logs for all services in this group will be permanently purged.`}
+      />
+
+      <DockerLogsModal
+        isOpen={isDockerLogsOpen}
+        onClose={() => setIsDockerLogsOpen(false)}
       />
     </div>
   );

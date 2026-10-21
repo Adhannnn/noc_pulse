@@ -1,32 +1,29 @@
-# backend/Dockerfile
-FROM node:20-slim AS builder
+# Build stage
+FROM golang:1.24-alpine AS builder
+
 WORKDIR /app
 
-# Install openssl for Prisma
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git ca-certificates tzdata
 
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm ci
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
-RUN npx prisma generate
-RUN npm run build
 
-FROM node:20-slim AS runner
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o pulsenoc-server ./cmd/server
+
+# Runner stage
+FROM alpine:3.21 AS runner
+
 WORKDIR /app
-ENV NODE_ENV=production
 
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk --no-cache add ca-certificates tzdata curl
 
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/pulsenoc-server /app/pulsenoc-server
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (node dist/src/main.js || node dist/main.js)"]
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:4000/health || exit 1
+
+CMD ["/app/pulsenoc-server"]

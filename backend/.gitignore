@@ -2,6 +2,9 @@
 /dist
 /node_modules
 /build
+/server
+/pulsenoc-server
+*.exe
 
 # Logs
 logs
