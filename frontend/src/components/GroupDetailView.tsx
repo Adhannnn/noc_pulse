@@ -41,7 +41,7 @@ export default function GroupDetailView({
   // Compute average group latency
   const avgLatency = useMemo(() => {
     if (groupMonitors.length === 0) return 0;
-    const sum = groupMonitors.reduce((acc, m) => acc + (m.heartbeats[0]?.latencyMs || 0), 0);
+    const sum = groupMonitors.reduce((acc, m) => acc + ((m.heartbeats && m.heartbeats[0]?.latencyMs) || 0), 0);
     return Math.round(sum / groupMonitors.length);
   }, [groupMonitors]);
 
@@ -49,8 +49,9 @@ export default function GroupDetailView({
   const groupUptimePct = useMemo(() => {
     if (groupMonitors.length === 0) return 100;
     const sumPct = groupMonitors.reduce((acc, m) => {
-      const totalHb = m.heartbeats.length;
-      const upHb = m.heartbeats.filter((hb) => hb.status === 'UP').length;
+      const hbs = m.heartbeats || [];
+      const totalHb = hbs.length;
+      const upHb = hbs.filter((hb) => hb.status === 'UP').length;
       return acc + (totalHb > 0 ? (upHb / totalHb) * 100 : (m.uptimePercent24h ?? 100));
     }, 0);
     return Math.round(sumPct / groupMonitors.length);
@@ -63,7 +64,7 @@ export default function GroupDetailView({
       let stepSum = 0;
       let count = 0;
       groupMonitors.forEach((m) => {
-        const hb = m.heartbeats[29 - i];
+        const hb = m.heartbeats ? m.heartbeats[29 - i] : null;
         if (hb) {
           stepSum += hb.latencyMs;
           count++;

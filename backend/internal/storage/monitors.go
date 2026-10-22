@@ -30,8 +30,30 @@ func (s *PostgresStore) GetAllMonitors(ctx context.Context) ([]models.Monitor, e
 		); err != nil {
 			return nil, err
 		}
+		m.Heartbeats = []models.Heartbeat{}
 		list = append(list, m)
 	}
+
+	// Fetch up to 30 recent heartbeats for each monitor
+	for i := range list {
+		hbRows, err := s.pool.Query(ctx, `
+			SELECT id, "monitorId", status, "latencyMs", "statusCode", "errorMessage", timestamp
+			FROM heartbeats
+			WHERE "monitorId" = $1
+			ORDER BY timestamp DESC
+			LIMIT 30
+		`, list[i].ID)
+		if err == nil {
+			for hbRows.Next() {
+				var hb models.Heartbeat
+				if err := hbRows.Scan(&hb.ID, &hb.MonitorID, &hb.Status, &hb.LatencyMs, &hb.StatusCode, &hb.ErrorMessage, &hb.Timestamp); err == nil {
+					list[i].Heartbeats = append(list[i].Heartbeats, hb)
+				}
+			}
+			hbRows.Close()
+		}
+	}
+
 	return list, nil
 }
 
@@ -52,6 +74,7 @@ func (s *PostgresStore) GetMonitorByID(ctx context.Context, id string) (*models.
 		return nil, err
 	}
 
+	m.Heartbeats = []models.Heartbeat{}
 	// Fetch recent heartbeats
 	hbRows, err := s.pool.Query(ctx, `
 		SELECT id, "monitorId", status, "latencyMs", "statusCode", "errorMessage", timestamp

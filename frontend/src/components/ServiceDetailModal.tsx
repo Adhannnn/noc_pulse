@@ -15,8 +15,9 @@ export default function ServiceDetailModal({ monitor, isOpen, onClose }: Service
   if (!isOpen || !monitor) return null;
 
   const isUp = monitor.currentStatus === 'UP';
-  const latestLatency = monitor.heartbeats[0]?.latencyMs ?? 0;
-  const recentLogs = monitor.heartbeats.slice(0, 15);
+  const heartbeats = monitor.heartbeats || [];
+  const latestLatency = heartbeats[0]?.latencyMs ?? 0;
+  const recentLogs = heartbeats.slice(0, 15);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -80,7 +81,7 @@ export default function ServiceDetailModal({ monitor, isOpen, onClose }: Service
           <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-xl">
             <div className="text-[10px] font-mono text-slate-400 uppercase">Total Probes Recorded</div>
             <div className="text-2xl font-bold text-slate-100 font-mono mt-1">
-              {monitor.heartbeats.length}
+              {heartbeats.length}
             </div>
           </div>
         </div>

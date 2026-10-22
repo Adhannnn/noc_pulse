@@ -165,8 +165,12 @@ export default function DashboardPage() {
     try {
       const res = await authFetch('/api/monitors');
       if (res.ok) {
-        const data = await res.json();
-        setMonitors(data);
+        const data: Monitor[] = await res.json();
+        const normalized = (data || []).map((m) => ({
+          ...m,
+          heartbeats: Array.isArray(m.heartbeats) ? m.heartbeats : [],
+        }));
+        setMonitors(normalized);
       }
     } catch (err) {
       console.error(err);
@@ -233,7 +237,7 @@ export default function DashboardPage() {
               ...m,
               currentStatus: data.status,
               uptimePercent24h: data.uptimePercent24h ?? m.uptimePercent24h,
-              heartbeats: [newHb, ...m.heartbeats.slice(0, 29)],
+              heartbeats: [newHb, ...(m.heartbeats || []).slice(0, 29)],
             };
             if (selectedMonitor && selectedMonitor.id === m.id) {
               setSelectedMonitor(updated as Monitor);
@@ -276,7 +280,7 @@ export default function DashboardPage() {
   const onlineServices = monitors.filter((m) => m.currentStatus === 'UP').length;
   const offlineServices = monitors.filter((m) => m.currentStatus === 'DOWN').length;
   const avgLatency = monitors.length > 0
-    ? Math.round(monitors.reduce((acc, m) => acc + (m.heartbeats[0]?.latencyMs || 0), 0) / (monitors.length || 1))
+    ? Math.round(monitors.reduce((acc, m) => acc + ((m.heartbeats && m.heartbeats[0]?.latencyMs) || 0), 0) / (monitors.length || 1))
     : 0;
 
   // Semua nilai di bawah ini "—" kalau hostMetrics belum ada, BUKAN "0.0" —
