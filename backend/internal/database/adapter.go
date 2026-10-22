@@ -17,10 +17,11 @@ type TelemetryStats struct {
 }
 
 type QueryResult struct {
-	Columns  []string                 `json:"columns"`
-	Rows     []map[string]interface{} `json:"rows"`
-	RowCount int                      `json:"rowCount"`
-	Duration string                   `json:"duration"`
+	Columns    []string                 `json:"columns"`
+	Rows       []map[string]interface{} `json:"rows"`
+	RowCount   int                      `json:"rowCount"`
+	Duration   string                   `json:"duration"`
+	DurationMs int64                    `json:"durationMs"`
 }
 
 type Adapter interface {

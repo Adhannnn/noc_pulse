@@ -46,7 +46,7 @@ func (s *DockerService) ListContainers(ctx context.Context) ([]ContainerInfo, er
 		return nil, err
 	}
 
-	var list []ContainerInfo
+	list := make([]ContainerInfo, 0)
 	for _, c := range result.Items {
 		var cleanedNames []string
 		for _, n := range c.Names {
