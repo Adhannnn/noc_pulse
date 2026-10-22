@@ -25,7 +25,7 @@ export default function MtBackupView() {
       const res = await authFetch('/api/backups');
       if (res.ok) {
         const data = await res.json();
-        setBackups(data);
+        setBackups(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -101,30 +101,38 @@ export default function MtBackupView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E2640]/60 text-slate-200">
-              {backups.map((item) => (
-                <tr key={item.id} className="hover:bg-[#161C2E] transition">
-                  <td className="px-5 py-3.5 font-semibold text-white">{item.deviceName}</td>
-                  <td className="px-5 py-3.5 text-amber-400">{item.filename}</td>
-                  <td className="px-5 py-3.5 text-slate-400">{(item.sizeKb / 1024).toFixed(2)} MB</td>
-                  <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3 h-3" /> {item.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-slate-400">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => alert(`Downloading backup file: ${item.filename}`)}
-                      className="p-1.5 bg-[#1E2640] hover:bg-slate-700 text-slate-200 rounded-lg transition"
-                      title="Download Backup RSC Archive"
-                    >
-                      <Download className="w-4 h-4 text-amber-400" />
-                    </button>
+              {(backups || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-slate-500 font-sans">
+                    No router backup records saved in the archive yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                (backups || []).map((item) => (
+                  <tr key={item.id} className="hover:bg-[#161C2E] transition">
+                    <td className="px-5 py-3.5 font-semibold text-white">{item.deviceName}</td>
+                    <td className="px-5 py-3.5 text-amber-400">{item.filename}</td>
+                    <td className="px-5 py-3.5 text-slate-400">{(item.sizeKb / 1024).toFixed(2)} MB</td>
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                        <CheckCircle2 className="w-3 h-3" /> {item.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-400">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => alert(`Downloading backup file: ${item.filename}`)}
+                        className="p-1.5 bg-[#1E2640] hover:bg-slate-700 text-slate-200 rounded-lg transition"
+                        title="Download Backup RSC Archive"
+                      >
+                        <Download className="w-4 h-4 text-amber-400" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

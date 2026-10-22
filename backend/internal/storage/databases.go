@@ -18,7 +18,7 @@ func (s *PostgresStore) GetAllDatabases(ctx context.Context) ([]models.DatabaseC
 	}
 	defer rows.Close()
 
-	var list []models.DatabaseConnection
+	list := make([]models.DatabaseConnection, 0)
 	for rows.Next() {
 		var db models.DatabaseConnection
 		if err := rows.Scan(

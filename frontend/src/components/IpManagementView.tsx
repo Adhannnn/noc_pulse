@@ -32,7 +32,7 @@ export default function IpManagementView() {
       const res = await authFetch('/api/ip-management');
       if (res.ok) {
         const data = await res.json();
-        setIpRecords(data);
+        setIpRecords(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -180,35 +180,43 @@ export default function IpManagementView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E2640]/60 text-slate-200">
-              {ipRecords.map((rec) => (
-                <tr key={rec.id} className="hover:bg-[#161C2E] transition">
-                  <td className="px-5 py-3.5 font-bold text-cyan-400">{rec.ip}</td>
-                  <td className="px-5 py-3.5 text-slate-400">{rec.subnet}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{rec.hostname || '-'}</td>
-                  <td className="px-5 py-3.5 text-slate-200">{rec.assignedTo || 'Unassigned'}</td>
-                  <td className="px-5 py-3.5">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        rec.status === 'GATEWAY'
-                          ? 'bg-purple-500/20 text-purple-400'
-                          : rec.status === 'ACTIVE'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {rec.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => handleDelete(rec.id)}
-                      className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              {(ipRecords || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-slate-500 font-sans">
+                    No IP allocations registered yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                (ipRecords || []).map((rec) => (
+                  <tr key={rec.id} className="hover:bg-[#161C2E] transition">
+                    <td className="px-5 py-3.5 font-bold text-cyan-400">{rec.ip}</td>
+                    <td className="px-5 py-3.5 text-slate-400">{rec.subnet}</td>
+                    <td className="px-5 py-3.5 text-slate-300">{rec.hostname || '-'}</td>
+                    <td className="px-5 py-3.5 text-slate-200">{rec.assignedTo || 'Unassigned'}</td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          rec.status === 'GATEWAY'
+                            ? 'bg-purple-500/20 text-purple-400'
+                            : rec.status === 'ACTIVE'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {rec.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => handleDelete(rec.id)}
+                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

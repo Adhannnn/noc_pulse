@@ -147,7 +147,7 @@ func (s *PostgresStore) GetAllGroups(ctx context.Context) ([]models.ServiceGroup
 	}
 	defer rows.Close()
 
-	var list []models.ServiceGroup
+	list := make([]models.ServiceGroup, 0)
 	for rows.Next() {
 		var g models.ServiceGroup
 		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedAt, &g.UpdatedAt); err != nil {
@@ -194,7 +194,7 @@ func (s *PostgresStore) GetAllIncidents(ctx context.Context) ([]models.Incident,
 	}
 	defer rows.Close()
 
-	var list []models.Incident
+	list := make([]models.Incident, 0)
 	for rows.Next() {
 		var inc models.Incident
 		if err := rows.Scan(&inc.ID, &inc.MonitorID, &inc.Title, &inc.Description, &inc.Severity, &inc.Status, &inc.StartedAt, &inc.ResolvedAt); err != nil {
