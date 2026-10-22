@@ -74,7 +74,7 @@ type Monitor struct {
 	UpdatedAt        time.Time           `json:"updatedAt"`
 	Timing           *TimingBreakdown    `json:"timing,omitempty"`
 	SSLCert          *SSLCertificateInfo `json:"sslCert,omitempty"`
-	Heartbeats       []Heartbeat         `json:"heartbeats,omitempty"`
+	Heartbeats       []Heartbeat         `json:"heartbeats"`
 }
 
 type Heartbeat struct {

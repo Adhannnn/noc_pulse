@@ -73,16 +73,17 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
   };
 
   const isUp = monitor.currentStatus === 'UP';
-  const latestLatency = monitor.heartbeats[0]?.latencyMs ?? 0;
-  const totalProbes = monitor.heartbeats.length;
+  const heartbeats = monitor.heartbeats || [];
+  const latestLatency = heartbeats[0]?.latencyMs ?? 0;
+  const totalProbes = heartbeats.length;
 
   const paddedHeartbeats = Array.from({ length: 30 }).map((_, i) => {
-    return monitor.heartbeats[29 - i] || null;
+    return heartbeats[29 - i] || null;
   });
 
-  const latencyHistory = monitor.heartbeats.map((hb) => hb.latencyMs).reverse();
+  const latencyHistory = heartbeats.map((hb) => hb.latencyMs).reverse();
 
-  const filteredHeartbeats = monitor.heartbeats.filter((hb) => {
+  const filteredHeartbeats = heartbeats.filter((hb) => {
     if (!logSearch) return true;
     const term = logSearch.toLowerCase();
     return (
@@ -158,7 +159,7 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" /> Probe Logs ({monitor.heartbeats.length})
+            <FileText className="w-3.5 h-3.5" /> Probe Logs ({heartbeats.length})
           </button>
           <button
             onClick={() => setActiveTab('TELEMETRY')}

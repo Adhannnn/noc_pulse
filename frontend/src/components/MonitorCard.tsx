@@ -57,15 +57,16 @@ interface Props {
 
 export default function MonitorCard({ monitor, onDelete, onSelect, isReadOnly = false }: Props) {
   const isUp = monitor.currentStatus === 'UP';
-  const latestLatency = monitor.heartbeats[0]?.latencyMs ?? 0;
+  const heartbeats = monitor.heartbeats || [];
+  const latestLatency = heartbeats[0]?.latencyMs ?? 0;
 
-  const totalHb = monitor.heartbeats.length;
-  const upHb = monitor.heartbeats.filter((hb) => hb.status === 'UP').length;
+  const totalHb = heartbeats.length;
+  const upHb = heartbeats.filter((hb) => hb.status === 'UP').length;
   const computedUptime = totalHb > 0 ? Math.round((upHb / totalHb) * 100) : (monitor.uptimePercent24h ?? 100);
 
   // Render 30 batang status (heartbeats)
   const paddedHeartbeats = Array.from({ length: 30 }).map((_, i) => {
-    return monitor.heartbeats[29 - i] || null;
+    return heartbeats[29 - i] || null;
   });
 
   return (
