@@ -23,7 +23,7 @@ export default function DatabasesView() {
       const res = await authFetch('/api/databases');
       if (res.ok) {
         const data = await res.json();
-        setDatabases(data);
+        setDatabases(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -80,7 +80,7 @@ export default function DatabasesView() {
         <div className="p-12 text-center text-slate-500 font-mono text-xs">
           Loading Database Connections...
         </div>
-      ) : databases.length === 0 ? (
+      ) : !databases || databases.length === 0 ? (
         <div className="bg-[#121829]/60 border border-dashed border-[#1E2640] rounded-2xl p-12 text-center text-slate-500 space-y-2">
           <Database className="w-8 h-8 text-slate-600 mx-auto" />
           <p className="font-semibold text-slate-300">No Databases Configured</p>
@@ -88,7 +88,7 @@ export default function DatabasesView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {databases.map((db) => (
+          {(databases || []).map((db) => (
             <div
               key={db.id}
               onClick={() => setSelectedDb(db)}

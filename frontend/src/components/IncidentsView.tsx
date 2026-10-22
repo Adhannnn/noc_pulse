@@ -38,7 +38,7 @@ export default function IncidentsView() {
       const res = await authFetch('/api/monitors/incidents/all');
       if (res.ok) {
         const data = await res.json();
-        setIncidents(data);
+        setIncidents(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -51,7 +51,7 @@ export default function IncidentsView() {
     fetchIncidents();
   }, []);
 
-  const filteredIncidents = incidents.filter((item) => {
+  const filteredIncidents = (incidents || []).filter((item) => {
     if (filter === 'ACTIVE') return item.status !== 'RESOLVED';
     if (filter === 'RESOLVED') return item.status === 'RESOLVED';
     return true;

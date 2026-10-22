@@ -124,13 +124,13 @@ export default function DashboardPage() {
 
   const groupedMonitors = (() => {
     const acc: Record<string, Monitor[]> = {};
-    registeredGroups.forEach((g) => {
+    (registeredGroups || []).forEach((g) => {
       acc[g.name] = [];
     });
-    if (Object.keys(acc).length === 0 && monitors.length === 0) {
+    if (Object.keys(acc).length === 0 && (monitors || []).length === 0) {
       acc['Home DC'] = [];
     }
-    monitors.forEach((m) => {
+    (monitors || []).forEach((m) => {
       const gName = m.group || 'Home DC';
       if (!acc[gName]) acc[gName] = [];
       acc[gName].push(m);
@@ -154,7 +154,7 @@ export default function DashboardPage() {
       const res = await authFetch('/api/groups');
       if (res.ok) {
         const data = await res.json();
-        setRegisteredGroups(data);
+        setRegisteredGroups(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -184,7 +184,7 @@ export default function DashboardPage() {
       const res = await authFetch('/api/metrics/history?limit=16');
       if (res.ok) {
         const data: HostMetric[] = await res.json();
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
           // API mengembalikan urutan terbaru dulu (desc) -> balik agar kronologis
           const chronological = [...data].reverse();
           setHostMetrics(chronological[chronological.length - 1]);

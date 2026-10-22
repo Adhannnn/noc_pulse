@@ -17,7 +17,7 @@ func (s *PostgresStore) GetAllIPs(ctx context.Context) ([]models.IPAddress, erro
 	}
 	defer rows.Close()
 
-	var list []models.IPAddress
+	list := make([]models.IPAddress, 0)
 	for rows.Next() {
 		var ip models.IPAddress
 		if err := rows.Scan(&ip.ID, &ip.IP, &ip.Subnet, &ip.Hostname, &ip.Status, &ip.AssignedTo, &ip.LastPingMs, &ip.CreatedAt, &ip.UpdatedAt); err != nil {
@@ -52,7 +52,7 @@ func (s *PostgresStore) GetAllBackups(ctx context.Context) ([]models.BackupRecor
 	}
 	defer rows.Close()
 
-	var list []models.BackupRecord
+	list := make([]models.BackupRecord, 0)
 	for rows.Next() {
 		var b models.BackupRecord
 		if err := rows.Scan(&b.ID, &b.DeviceName, &b.Filename, &b.SizeKB, &b.Status, &b.CreatedAt); err != nil {
@@ -82,7 +82,7 @@ func (s *PostgresStore) GetAllAlertChannels(ctx context.Context) ([]models.Alert
 	}
 	defer rows.Close()
 
-	var list []models.AlertChannel
+	list := make([]models.AlertChannel, 0)
 	for rows.Next() {
 		var ac models.AlertChannel
 		if err := rows.Scan(&ac.ID, &ac.Name, &ac.Type, &ac.WebhookURL, &ac.ChatID, &ac.BotToken, &ac.IsEnabled, &ac.CreatedAt, &ac.UpdatedAt); err != nil {

@@ -278,7 +278,7 @@ func (s *PostgresStore) GetAllUsers(ctx context.Context) ([]models.User, error) 
 	}
 	defer rows.Close()
 
-	var users []models.User
+	users := make([]models.User, 0)
 	for rows.Next() {
 		var u models.User
 		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.CreatedAt, &u.UpdatedAt); err != nil {
@@ -344,7 +344,7 @@ func (s *PostgresStore) GetHostMetricsHistory(ctx context.Context, limit int) ([
 	}
 	defer rows.Close()
 
-	var list []models.HostMetric
+	list := make([]models.HostMetric, 0)
 	for rows.Next() {
 		var m models.HostMetric
 		if err := rows.Scan(

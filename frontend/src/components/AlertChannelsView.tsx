@@ -39,7 +39,7 @@ export default function AlertChannelsView() {
       const res = await authFetch('/api/alerts/channels');
       if (res.ok) {
         const data = await res.json();
-        setChannels(data);
+        setChannels(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -235,13 +235,13 @@ export default function AlertChannelsView() {
         <div className="p-12 text-center text-slate-500 font-mono text-sm">
           Loading Alert Integrations...
         </div>
-      ) : channels.length === 0 ? (
+      ) : !channels || channels.length === 0 ? (
         <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl p-12 text-center text-slate-500">
           <p>No alert destinations registered. Click &quot;Add Alert Channel&quot; to hook Discord or Telegram!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {channels.map((channel) => (
+          {(channels || []).map((channel) => (
             <div
               key={channel.id}
               className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 hover:border-slate-700 transition"

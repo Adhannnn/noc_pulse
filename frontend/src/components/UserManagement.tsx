@@ -35,7 +35,7 @@ export default function UserManagement() {
       const res = await authFetch('/api/auth/users');
       if (res.ok) {
         const data = await res.json();
-        setUsers(data);
+        setUsers(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -242,7 +242,7 @@ export default function UserManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                {users.map((u) => {
+                {(users || []).map((u) => {
                   const isCurrent = currentUser?.id === u.id;
                   const isAdmin = u.role === 'ADMIN';
                   return (
