@@ -50,6 +50,21 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
 
   const { authFetch } = useAuth();
 
+  // Helper to format any column value without throwing
+  const renderCell = (val: unknown): React.ReactNode => {
+    if (val === undefined || val === null) {
+      return <span className="text-slate-600">NULL</span>;
+    }
+    if (typeof val === 'object') {
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return '[Object]';
+      }
+    }
+    return String(val);
+  };
+
   // Fetch real PostgreSQL tables list
   const fetchTables = async () => {
     setLoadingTables(true);
@@ -57,13 +72,24 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
       const res = await authFetch(`/api/databases/${db.id}/tables`);
       if (res.ok) {
         const data = await res.json();
-        setTables(data);
-        if (data && data.length > 0) {
-          fetchTableData(data[0]);
+        const validTables = Array.isArray(data) ? data : [];
+        setTables(validTables);
+        if (validTables.length > 0) {
+          fetchTableData(validTables[0]);
+        } else {
+          setSelectedTable(null);
+          setTableData(null);
         }
+      } else {
+        setTables([]);
+        setSelectedTable(null);
+        setTableData(null);
       }
     } catch (err) {
       console.error(err);
+      setTables([]);
+      setSelectedTable(null);
+      setTableData(null);
     } finally {
       setLoadingTables(false);
     }
@@ -74,13 +100,31 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
     setSelectedTable(tableName);
     setLoadingRows(true);
     try {
-      const res = await authFetch(`/api/databases/${db.id}/tables/${tableName}`);
+      const res = await authFetch(`/api/databases/${db.id}/tables/${encodeURIComponent(tableName)}`);
       if (res.ok) {
         const data = await res.json();
-        setTableData(data);
+        setTableData({
+          columns: Array.isArray(data?.columns) ? data.columns : [],
+          rows: Array.isArray(data?.rows) ? data.rows : [],
+          rowCount: typeof data?.rowCount === 'number' ? data.rowCount : (Array.isArray(data?.rows) ? data.rows.length : 0),
+          durationMs: typeof data?.durationMs === 'number' ? data.durationMs : 0,
+        });
+      } else {
+        setTableData({
+          columns: [],
+          rows: [],
+          rowCount: 0,
+          durationMs: 0,
+        });
       }
     } catch (err) {
       console.error(err);
+      setTableData({
+        columns: [],
+        rows: [],
+        rowCount: 0,
+        durationMs: 0,
+      });
     } finally {
       setLoadingRows(false);
     }
@@ -96,7 +140,12 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
       });
       if (res.ok) {
         const data = await res.json();
-        setQueryResults(data);
+        setQueryResults({
+          columns: Array.isArray(data?.columns) ? data.columns : [],
+          rows: Array.isArray(data?.rows) ? data.rows : [],
+          rowCount: typeof data?.rowCount === 'number' ? data.rowCount : (Array.isArray(data?.rows) ? data.rows.length : 0),
+          durationMs: typeof data?.durationMs === 'number' ? data.durationMs : 0,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -109,8 +158,9 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
     fetchTables();
   }, [db.id]);
 
-  const filteredTables = tables.filter((t) =>
-    t.toLowerCase().includes(tableSearch.toLowerCase()),
+  const safeTables = Array.isArray(tables) ? tables : [];
+  const filteredTables = safeTables.filter((t) =>
+    t.toLowerCase().includes((tableSearch || '').toLowerCase()),
   );
 
   return (
@@ -156,7 +206,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Table className="w-3.5 h-3.5" /> Tables Explorer ({tables.length})
+            <Table className="w-3.5 h-3.5" /> Tables Explorer ({safeTables.length})
           </button>
           <button
             onClick={() => setActiveTab('CONSOLE')}
@@ -269,7 +319,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                 <table className="w-full text-left text-xs font-mono">
                   <thead className="bg-[#070913] border-b border-[#1E2640] text-purple-300 uppercase text-[10px]">
                     <tr>
-                      {tableData.columns.map((col) => (
+                      {(tableData.columns || []).map((col) => (
                         <th key={col} className="px-4 py-2.5 whitespace-nowrap">
                           {col}
                         </th>
@@ -277,10 +327,10 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1E2640]/60 text-slate-200">
-                    {tableData.rows.length === 0 ? (
+                    {(!tableData.rows || tableData.rows.length === 0) ? (
                       <tr>
                         <td
-                          colSpan={tableData.columns.length || 1}
+                          colSpan={(tableData.columns || []).length || 1}
                           className="px-4 py-10 text-center text-slate-500 font-mono text-xs italic bg-[#070913]/40"
                         >
                           No records found in table &quot;{selectedTable}&quot; (0 rows).
@@ -289,9 +339,9 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                     ) : (
                       tableData.rows.map((row, idx) => (
                         <tr key={idx} className="hover:bg-[#161C2E] transition">
-                          {tableData.columns.map((col) => (
+                          {(tableData.columns || []).map((col) => (
                             <td key={col} className="px-4 py-2.5 max-w-xs truncate">
-                              {row[col] !== undefined ? String(row[col]) : <span className="text-slate-600">NULL</span>}
+                              {renderCell(row ? row[col] : undefined)}
                             </td>
                           ))}
                         </tr>
@@ -365,7 +415,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                 <table className="w-full text-left text-xs font-mono">
                   <thead className="bg-[#070913] border-b border-[#1E2640] text-purple-300 uppercase text-[10px]">
                     <tr>
-                      {queryResults.columns.map((col) => (
+                      {(queryResults.columns || []).map((col) => (
                         <th key={col} className="px-4 py-2.5 whitespace-nowrap">
                           {col}
                         </th>
@@ -373,10 +423,10 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1E2640]/60 text-slate-200">
-                    {queryResults.rows.length === 0 ? (
+                    {(!queryResults.rows || queryResults.rows.length === 0) ? (
                       <tr>
                         <td
-                          colSpan={queryResults.columns.length || 1}
+                          colSpan={(queryResults.columns || []).length || 1}
                           className="px-4 py-8 text-center text-slate-500 font-mono text-xs italic bg-[#070913]/40"
                         >
                           Query executed successfully. 0 rows returned.
@@ -385,9 +435,9 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
                     ) : (
                       queryResults.rows.map((row, idx) => (
                         <tr key={idx} className="hover:bg-[#161C2E] transition">
-                          {queryResults.columns.map((col) => (
+                          {(queryResults.columns || []).map((col) => (
                             <td key={col} className="px-4 py-2.5 max-w-xs truncate">
-                              {row[col] !== undefined ? String(row[col]) : <span className="text-slate-600">NULL</span>}
+                              {renderCell(row ? row[col] : undefined)}
                             </td>
                           ))}
                         </tr>

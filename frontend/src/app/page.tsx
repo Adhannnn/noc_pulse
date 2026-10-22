@@ -22,6 +22,7 @@ import UserManagement from '@/components/UserManagement';
 import MemoryDetailView from '@/components/MemoryDetailView';
 import SshTerminalView from '@/components/SshTerminalView';
 import DockerLogsModal from '@/components/DockerLogsModal';
+import DockerLogsView from '@/components/DockerLogsView';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -331,11 +332,13 @@ export default function DashboardPage() {
               {currentTab === 'OVERVIEW' && 'Overview'}
               {currentTab === 'SERVICES' && 'Services'}
               {currentTab === 'DATABASES' && 'Databases'}
+              {currentTab === 'DOCKER' && 'Docker Fleet & Logs'}
               {currentTab === 'INCIDENTS' && 'Incidents Log'}
               {currentTab === 'IPMANAGEMENT' && 'IP Management'}
               {currentTab === 'MTBACKUP' && 'MT Backup Vault'}
               {currentTab === 'ALERTS' && 'Alert Integration Channels'}
               {currentTab === 'USERS' && 'User Access Directory'}
+              {currentTab === 'SSH' && 'SSH Console'}
             </h1>
             <p className="text-xs text-slate-400 mt-1">
               Manage and monitor your network infrastructure in real-time.
@@ -343,12 +346,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsDockerLogsOpen(true)}
-              className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
-            >
-              <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Docker Logs
-            </button>
+            {currentTab === 'OVERVIEW' && (
+              <button
+                onClick={() => setCurrentTab('DOCKER')}
+                className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
+              >
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Docker Logs
+              </button>
+            )}
 
             {currentTab === 'SERVICES' && (
               <button
@@ -715,6 +720,7 @@ export default function DashboardPage() {
             )}
 
             {currentTab === 'DATABASES' && <DatabasesView key={dbKey} />}
+            {currentTab === 'DOCKER' && <DockerLogsView />}
             {currentTab === 'INCIDENTS' && <IncidentsView />}
             {currentTab === 'IPMANAGEMENT' && <IpManagementView />}
             {currentTab === 'MTBACKUP' && <MtBackupView />}

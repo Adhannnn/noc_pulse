@@ -81,7 +81,7 @@ func (a *MySQLAdapter) ListTables(ctx context.Context) ([]string, error) {
 	}
 	defer rows.Close()
 
-	var tables []string
+	tables := make([]string, 0)
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err == nil {
@@ -111,8 +111,11 @@ func (a *MySQLAdapter) ExecuteQuery(ctx context.Context, query string) (*QueryRe
 	if err != nil {
 		return nil, err
 	}
+	if cols == nil {
+		cols = make([]string, 0)
+	}
 
-	var results []map[string]interface{}
+	results := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		columns := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
@@ -127,8 +130,12 @@ func (a *MySQLAdapter) ExecuteQuery(ctx context.Context, query string) (*QueryRe
 		m := make(map[string]interface{})
 		for i, colName := range cols {
 			val := columnPointers[i].(*interface{})
-			if b, ok := (*val).([]byte); ok {
+			if val == nil || *val == nil {
+				m[colName] = nil
+			} else if b, ok := (*val).([]byte); ok {
 				m[colName] = string(b)
+			} else if t, ok := (*val).(time.Time); ok {
+				m[colName] = t.Format(time.RFC3339)
 			} else {
 				m[colName] = *val
 			}
@@ -137,10 +144,11 @@ func (a *MySQLAdapter) ExecuteQuery(ctx context.Context, query string) (*QueryRe
 	}
 
 	return &QueryResult{
-		Columns:  cols,
-		Rows:     results,
-		RowCount: len(results),
-		Duration: time.Since(start).String(),
+		Columns:    cols,
+		Rows:       results,
+		RowCount:   len(results),
+		Duration:   time.Since(start).String(),
+		DurationMs: time.Since(start).Milliseconds(),
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"time"
 
 	"github.com/google/uuid"
@@ -162,28 +163,95 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 	hInfo, err := host.Info()
 	if err != nil {
 		return map[string]interface{}{
-			"hostname": "debian-server",
-			"os":       "linux",
-			"platform": "debian",
-			"uptime":   86400,
+			"hostname":      "debian-server",
+			"os":            "linux",
+			"platform":      "debian",
+			"kernel":        "Linux",
+			"kernelVersion": "Linux",
+			"uptime":        "1d 0h",
+			"uptimeSeconds": uint64(86400),
+			"cpuCores":      "4 Cores",
+			"cpuCount":      4,
+			"ipAddress":     "127.0.0.1",
+			"ipAddresses":   []string{"127.0.0.1"},
 		}, nil
 	}
 
 	cpuInfo, _ := cpu.Info()
 	cpuModel := "Native CPU"
-	if len(cpuInfo) > 0 {
+	if len(cpuInfo) > 0 && cpuInfo[0].ModelName != "" {
 		cpuModel = cpuInfo[0].ModelName
 	}
+
+	cores, _ := cpu.Counts(true)
+	if cores <= 0 {
+		cores = len(cpuInfo)
+	}
+	if cores <= 0 {
+		cores = 1
+	}
+
+	// Collect host network IP addresses (non-loopback IPv4)
+	var ips []string
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				var ip net.IP
+				switch v := addr.(type) {
+				case *net.IPNet:
+					ip = v.IP
+				case *net.IPAddr:
+					ip = v.IP
+				}
+				if ip != nil && ip.To4() != nil && !ip.IsLoopback() {
+					ips = append(ips, ip.String())
+				}
+			}
+		}
+	}
+	primaryIP := "127.0.0.1"
+	if len(ips) > 0 {
+		primaryIP = ips[0]
+	}
+
+	uptimeStr := formatUptime(hInfo.Uptime)
 
 	return map[string]interface{}{
 		"hostname":        hInfo.Hostname,
 		"os":              hInfo.OS,
 		"platform":        hInfo.Platform,
 		"platformVersion": hInfo.PlatformVersion,
+		"kernel":          hInfo.KernelVersion,
 		"kernelVersion":   hInfo.KernelVersion,
-		"uptime":          hInfo.Uptime,
+		"uptime":          uptimeStr,
+		"uptimeSeconds":   hInfo.Uptime,
+		"cpuCores":        fmt.Sprintf("%d Cores", cores),
+		"cpuCount":        cores,
 		"cpuModel":        cpuModel,
+		"ipAddress":       primaryIP,
+		"ipAddresses":     ips,
 	}, nil
+}
+
+func formatUptime(seconds uint64) string {
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	minutes := (seconds % 3600) / 60
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }
 
 func roundTwoDecimals(val float64) float64 {

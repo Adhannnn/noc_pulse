@@ -15,12 +15,14 @@ import {
   Users,
   LogOut,
   Radio,
+  Box,
 } from 'lucide-react';
 
 export type NOCNavSection =
   | 'OVERVIEW'
   | 'SERVICES'
   | 'DATABASES'
+  | 'DOCKER'
   | 'INCIDENTS'
   | 'IPMANAGEMENT'
   | 'MTBACKUP'
@@ -102,6 +104,18 @@ export default function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
               >
                 <Database className="w-4 h-4 text-purple-400" />
                 <span>Databases</span>
+              </button>
+
+              <button
+                onClick={() => onSelectTab('DOCKER')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition ${
+                  currentTab === 'DOCKER'
+                    ? 'bg-indigo-600 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-[#161C2E]'
+                }`}
+              >
+                <Box className="w-4 h-4 text-sky-400" />
+                <span>Docker Logs</span>
               </button>
 
               <button
