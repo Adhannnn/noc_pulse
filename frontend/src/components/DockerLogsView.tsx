@@ -89,8 +89,11 @@ export default function DockerLogsView() {
     setIsStreaming(true);
 
     const baseWsUrl = getWsBaseUrl();
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-    const wsUrl = `${baseWsUrl.replace(/^http/, 'ws')}/api/docker/containers/${selectedContainer.id}/logs?tail=250&token=${encodeURIComponent(token || '')}`;
+    const token =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('pulsenoc_token') || localStorage.getItem('token') || ''
+        : '';
+    const wsUrl = `${baseWsUrl.replace(/^http/, 'ws')}/api/docker/containers/${selectedContainer.id}/logs?tail=250&token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

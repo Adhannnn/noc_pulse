@@ -81,7 +81,11 @@ export default function DockerLogsModal({ isOpen, onClose }: Props) {
     setIsStreaming(true);
 
     const baseWsUrl = getWsBaseUrl();
-    const wsUrl = `${baseWsUrl.replace(/^http/, 'ws')}/api/docker/containers/${selectedContainer}/logs?tail=200`;
+    const token =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('pulsenoc_token') || localStorage.getItem('token') || ''
+        : '';
+    const wsUrl = `${baseWsUrl.replace(/^http/, 'ws')}/api/docker/containers/${selectedContainer}/logs?tail=200&token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

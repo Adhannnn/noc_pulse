@@ -238,7 +238,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
           <div className="col-span-12 md:col-span-3 bg-[#121829] border border-[#1E2640] rounded-2xl p-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-purple-400" /> PostgreSQL Tables
+                <Layers className="w-4 h-4 text-purple-400" /> {db.engine ? `${db.engine} Tables` : 'Database Tables'}
               </span>
               <button
                 onClick={fetchTables}
