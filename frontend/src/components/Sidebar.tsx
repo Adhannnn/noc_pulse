@@ -9,7 +9,6 @@ import {
   Database,
   Terminal,
   ShieldAlert,
-  Layers,
   HardDrive,
   Bell,
   Users,
@@ -26,7 +25,6 @@ export type NOCNavSection =
   | 'DATABASES'
   | 'DOCKER'
   | 'INCIDENTS'
-  | 'IPMANAGEMENT'
   | 'MTBACKUP'
   | 'ALERTS'
   | 'USERS'
@@ -101,12 +99,6 @@ const NAV_CATEGORIES: NavCategory[] = [
         label: 'Incidents Log',
         icon: ShieldAlert,
         iconColor: 'text-rose-400',
-      },
-      {
-        id: 'IPMANAGEMENT',
-        label: 'IP Management',
-        icon: Layers,
-        iconColor: 'text-cyan-400',
       },
       {
         id: 'MTBACKUP',

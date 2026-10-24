@@ -14,7 +14,6 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
 import ServiceDetailView from '@/components/ServiceDetailView';
 import GroupDetailView from '@/components/GroupDetailView';
 import DatabasesView from '@/components/DatabasesView';
-import IpManagementView from '@/components/IpManagementView';
 import MtBackupView from '@/components/MtBackupView';
 import IncidentsView from '@/components/IncidentsView';
 import AlertChannelsView from '@/components/AlertChannelsView';
@@ -334,7 +333,6 @@ export default function DashboardPage() {
               {currentTab === 'DATABASES' && 'Databases'}
               {currentTab === 'DOCKER' && 'Docker Fleet & Logs'}
               {currentTab === 'INCIDENTS' && 'Incidents Log'}
-              {currentTab === 'IPMANAGEMENT' && 'IP Management'}
               {currentTab === 'MTBACKUP' && 'MT Backup Vault'}
               {currentTab === 'ALERTS' && 'Alert Integration Channels'}
               {currentTab === 'USERS' && 'User Access Directory'}
@@ -722,7 +720,6 @@ export default function DashboardPage() {
             {currentTab === 'DATABASES' && <DatabasesView key={dbKey} />}
             {currentTab === 'DOCKER' && <DockerLogsView />}
             {currentTab === 'INCIDENTS' && <IncidentsView />}
-            {currentTab === 'IPMANAGEMENT' && <IpManagementView />}
             {currentTab === 'MTBACKUP' && <MtBackupView />}
             {currentTab === 'ALERTS' && <AlertChannelsView />}
             {currentTab === 'USERS' && <UserManagement />}
