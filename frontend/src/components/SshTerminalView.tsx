@@ -27,35 +27,45 @@ interface AnsiSegment {
 }
 
 function parseAnsi(text: string): AnsiSegment[] {
-  // Strip non-color CSI escapes (e.g., cursor moves, bracketed paste)
+  // 1. Strip OSC (Operating System Command) sequences (e.g. \x1b]0;title\x07 or \x1b]0;title\x1b\)
+  // and handle edge cases where \x1b was dropped/rendered separately
   const cleanedText = text
+    .replace(/\x1b\][0-9]+;[^\x07\x1b]*(\x07|\x1b\\)?/g, '')
+    .replace(/\]0;[^\x07\r\n]*\x07/g, '')
+    // 2. Strip private modes / bracketed paste / cursor toggles
     .replace(/\x1b\[\?[0-9;]*[a-zA-Z]/g, '')
-    .replace(/\x1b\[[0-9;]*[A-HJKST]/g, '');
+    // 3. Strip non-color CSI escapes (cursor moves, display/line clear, scrolling)
+    .replace(/\x1b\[[0-9;]*[A-HJKSTf]/g, '')
+    // 4. Strip character set selections
+    .replace(/\x1b\([AB012]/g, '')
+    // 5. Strip BEL and NUL characters
+    .replace(/[\x00\x07]/g, '');
 
   const ansiRegex = /\x1b\[([0-9;]*)m/g;
   const segments: AnsiSegment[] = [];
   let lastIndex = 0;
   const currentClasses = new Set<string>();
 
+  // Calibrated, eye-friendly iTerm2 palette (comfortable contrast, no harsh neon glare)
   const colorMap: Record<string, string> = {
-    '30': 'text-slate-900',
-    '31': 'text-rose-400',
+    '30': 'text-slate-600',
+    '31': 'text-red-400',
     '32': 'text-emerald-400',
     '33': 'text-amber-300',
     '34': 'text-sky-400',
-    '35': 'text-fuchsia-400',
-    '36': 'text-cyan-300',
-    '37': 'text-slate-100',
+    '35': 'text-purple-400',
+    '36': 'text-teal-400',
+    '37': 'text-slate-300',
     '90': 'text-slate-500',
-    '91': 'text-rose-400',
+    '91': 'text-red-300',
     '92': 'text-emerald-300',
     '93': 'text-amber-200',
     '94': 'text-sky-300',
     '95': 'text-purple-300',
     '96': 'text-teal-300',
-    '97': 'text-white',
-    '1': 'font-bold',
-    '2': 'opacity-70',
+    '97': 'text-slate-100',
+    '1': 'font-semibold',
+    '2': 'opacity-65',
     '3': 'italic',
     '4': 'underline',
   };
@@ -115,6 +125,7 @@ export default function SshTerminalView() {
     'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'ERROR'
   >('DISCONNECTED');
   const [statusMessage, setStatusMessage] = useState('');
+  const [tabTitle, setTabTitle] = useState('');
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [inputBuffer, setInputBuffer] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -152,7 +163,7 @@ export default function SshTerminalView() {
           setShowConfig(false);
           setTerminalOutput((prev) => [
             ...prev,
-            `\x1b[32m[iTerm SSH] Successfully authenticated to ${username}@${data.host || host}:${port}\x1b[0m\r\n`,
+            `\x1b[90m➜ Connected to ${username}@${data.host || host}:${port} (session active)\x1b[0m\r\n`,
           ]);
         } else if (data.status === 'ERROR') {
           setSessionStatus('ERROR');
@@ -160,21 +171,37 @@ export default function SshTerminalView() {
           setShowConfig(true);
           setTerminalOutput((prev) => [
             ...prev,
-            `\x1b[31m[iTerm SSH ERROR] ${data.message || 'Connection failed'}\x1b[0m\r\n`,
+            `\x1b[31m✖ SSH error: ${data.message || 'Connection failed'}\x1b[0m\r\n`,
           ]);
         } else if (data.status === 'DISCONNECTED') {
           setSessionStatus('DISCONNECTED');
           setStatusMessage(data.message || 'SSH Session Ended');
           setTerminalOutput((prev) => [
             ...prev,
-            `\x1b[33m[iTerm SSH] Connection closed.\x1b[0m\r\n`,
+            `\x1b[90m➜ Connection closed by remote host.\x1b[0m\r\n`,
           ]);
         }
       },
     );
 
     socket.on('ssh:data', (data: string) => {
-      setTerminalOutput((prev) => [...prev, data]);
+      // Extract dynamic shell title from OSC sequence if emitted by bash/shell
+      const titleMatch = data.match(/\x1b\]0;([^\x07\x1b]+)/);
+      if (titleMatch && titleMatch[1]) {
+        setTabTitle(titleMatch[1]);
+      }
+
+      // Handle screen clear sequences (\x1b[2J, \x1b[3J, \x1bc, \x1b[H\x1b[2J)
+      const clearIdx = Math.max(
+        data.lastIndexOf('\x1b[2J'),
+        data.lastIndexOf('\x1b[3J'),
+        data.lastIndexOf('\x1bc')
+      );
+      if (clearIdx !== -1) {
+        setTerminalOutput([data.substring(clearIdx)]);
+      } else {
+        setTerminalOutput((prev) => [...prev, data]);
+      }
     });
 
     return () => {
@@ -191,7 +218,7 @@ export default function SshTerminalView() {
     setStatusMessage('Initiating SSH handshake...');
     setTerminalOutput([
       `\x1b[90mLast login: ${new Date().toLocaleString()} on ttys001\x1b[0m\r\n` +
-        `\x1b[34m[iTerm SSH]\x1b[0m Connecting to ${username}@${host}:${port} (xterm-256color PTY)...\r\n`,
+        `\x1b[90mConnecting to ${username}@${host}:${port} (xterm-256color PTY)...\x1b[0m\r\n`,
     ]);
 
     socket.emit('ssh:connect', {
@@ -212,6 +239,10 @@ export default function SshTerminalView() {
 
   const sendCommand = (cmd: string) => {
     if (!socket || sessionStatus !== 'CONNECTED') return;
+    const trimmed = cmd.trim();
+    if (trimmed === 'clear' || trimmed === 'cls') {
+      setTerminalOutput([]);
+    }
     socket.emit('ssh:input', { data: cmd + '\n' });
     setCommandHistory((prev) => [...prev, cmd]);
     setHistoryIndex(-1);
@@ -248,9 +279,12 @@ export default function SshTerminalView() {
       if (socket && sessionStatus === 'CONNECTED') {
         socket.emit('ssh:input', { data: '\x03' });
       }
-    } else if (e.ctrlKey && e.key === 'l') {
+    } else if ((e.ctrlKey && e.key === 'l') || (e.metaKey && e.key === 'k')) {
       e.preventDefault();
       setTerminalOutput([]);
+      if (socket && sessionStatus === 'CONNECTED') {
+        socket.emit('ssh:input', { data: '\x0c' });
+      }
     }
   };
 
@@ -463,14 +497,14 @@ export default function SshTerminalView() {
               <span
                 className={`w-2 h-2 rounded-full ${
                   sessionStatus === 'CONNECTED'
-                    ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                    ? 'bg-emerald-400'
                     : sessionStatus === 'CONNECTING'
                     ? 'bg-amber-400 animate-spin'
                     : 'bg-slate-600'
                 }`}
               />
-              <span className="font-semibold text-slate-200 truncate max-w-[240px]">
-                {username}@{host} — bash
+              <span className="font-semibold text-slate-200 truncate max-w-[280px]">
+                {tabTitle || `${username}@${host} — bash`}
               </span>
             </div>
           </div>
@@ -497,7 +531,7 @@ export default function SshTerminalView() {
         <div
           ref={outputRef}
           onClick={() => inputRef.current?.focus()}
-          className="flex-1 p-5 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed cursor-text selection:bg-indigo-600 selection:text-white bg-[#080C14] text-slate-200 scrollbar-thin scrollbar-thumb-slate-800"
+          className="flex-1 p-5 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed cursor-text selection:bg-indigo-600/40 selection:text-white bg-[#0A0E17] text-slate-300 scrollbar-thin scrollbar-thumb-slate-800"
         >
           {terminalOutput.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-600 space-y-2 select-none py-16">
@@ -521,10 +555,10 @@ export default function SshTerminalView() {
           {sessionStatus === 'CONNECTED' && (
             <div className="inline-flex items-baseline flex-wrap font-mono text-xs mt-1 align-bottom">
               {/* Active command text typed directly at cursor */}
-              <span className="text-slate-100 whitespace-pre">{inputBuffer}</span>
+              <span className="text-slate-200 whitespace-pre">{inputBuffer}</span>
 
-              {/* Classic iTerm Blinking Green Block Cursor */}
-              <span className="inline-block w-2.5 h-4 bg-emerald-400 animate-pulse ml-0.5 align-middle shadow-[0_0_8px_#34d399] translate-y-0.5" />
+              {/* Classic iTerm Blinking Green Block Cursor without blur glow */}
+              <span className="inline-block w-2 h-4 bg-emerald-400/90 animate-pulse ml-0.5 align-middle select-none rounded-[1px] translate-y-0.5" />
 
               {/* Transparent hidden input capturing keystrokes without any separate input bar */}
               <input
