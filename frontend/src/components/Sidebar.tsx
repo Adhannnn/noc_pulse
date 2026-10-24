@@ -195,7 +195,11 @@ export default function Sidebar({
       } bg-[#0D111D] border-r border-[#1E2640] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans select-none text-slate-300 transition-all duration-300 ease-in-out z-30`}
     >
       {/* Top Header & Navigation Section */}
-      <div className="overflow-y-auto overflow-x-hidden p-3 space-y-5 scrollbar-thin scrollbar-thumb-slate-800">
+      <div
+        className={`flex-1 p-3 space-y-5 scrollbar-thin scrollbar-thumb-slate-800 ${
+          isCollapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden'
+        }`}
+      >
         {/* Brand Header */}
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-2 py-1">
@@ -307,7 +311,7 @@ export default function Sidebar({
       </div>
 
       {/* Bottom Profile Footer Box */}
-      <div className="p-3 border-t border-[#1E2640] bg-[#090C16]">
+      <div className={`p-3 border-t border-[#1E2640] bg-[#090C16] ${isCollapsed ? 'overflow-visible' : ''}`}>
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-2">
             <div
