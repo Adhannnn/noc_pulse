@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { FolderPlus, X } from 'lucide-react';
 
 interface Props {
@@ -16,6 +17,7 @@ export default function AddGroupModal({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   if (!isOpen) return null;
 
@@ -37,11 +39,14 @@ export default function AddGroupModal({ isOpen, onClose, onSuccess }: Props) {
         throw new Error(data.message || 'Failed to create group');
       }
 
+      toast.success(`Service group "${name}" created successfully`);
       setName('');
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create group';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -77,7 +82,7 @@ export default function AddGroupModal({ isOpen, onClose, onSuccess }: Props) {
             <input
               type="text"
               required
-              placeholder="e.g. Production Cluster, Edge Gateway, Home DC"
+              placeholder="e.g. Production Cluster, Edge Gateway"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-[#121829] border border-[#1E2640] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"

@@ -163,22 +163,24 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 	hInfo, err := host.Info()
 	if err != nil {
 		return map[string]interface{}{
-			"hostname":      "debian-server",
-			"os":            "linux",
-			"platform":      "debian",
-			"kernel":        "Linux",
-			"kernelVersion": "Linux",
-			"uptime":        "1d 0h",
-			"uptimeSeconds": uint64(86400),
-			"cpuCores":      "4 Cores",
-			"cpuCount":      4,
-			"ipAddress":     "127.0.0.1",
-			"ipAddresses":   []string{"127.0.0.1"},
+			"hostname":        "-",
+			"os":              "-",
+			"platform":        "-",
+			"platformVersion": "-",
+			"kernel":          "-",
+			"kernelVersion":   "-",
+			"uptime":          "-",
+			"uptimeSeconds":   uint64(0),
+			"cpuCores":        "-",
+			"cpuCount":        0,
+			"cpuModel":        "-",
+			"ipAddress":       "-",
+			"ipAddresses":     []string{},
 		}, nil
 	}
 
 	cpuInfo, _ := cpu.Info()
-	cpuModel := "Native CPU"
+	cpuModel := "-"
 	if len(cpuInfo) > 0 && cpuInfo[0].ModelName != "" {
 		cpuModel = cpuInfo[0].ModelName
 	}
@@ -186,9 +188,6 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 	cores, _ := cpu.Counts(true)
 	if cores <= 0 {
 		cores = len(cpuInfo)
-	}
-	if cores <= 0 {
-		cores = 1
 	}
 
 	// Collect host network IP addresses (non-loopback IPv4)
@@ -217,12 +216,16 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 			}
 		}
 	}
-	primaryIP := "127.0.0.1"
+	primaryIP := "-"
 	if len(ips) > 0 {
 		primaryIP = ips[0]
 	}
 
 	uptimeStr := formatUptime(hInfo.Uptime)
+	cpuCoresStr := "-"
+	if cores > 0 {
+		cpuCoresStr = fmt.Sprintf("%d Cores", cores)
+	}
 
 	return map[string]interface{}{
 		"hostname":        hInfo.Hostname,
@@ -233,7 +236,7 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 		"kernelVersion":   hInfo.KernelVersion,
 		"uptime":          uptimeStr,
 		"uptimeSeconds":   hInfo.Uptime,
-		"cpuCores":        fmt.Sprintf("%d Cores", cores),
+		"cpuCores":        cpuCoresStr,
 		"cpuCount":        cores,
 		"cpuModel":        cpuModel,
 		"ipAddress":       primaryIP,

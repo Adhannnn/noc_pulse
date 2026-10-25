@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
+import { useToast } from '@/context/ToastContext';
 import {
   Terminal as TerminalIcon,
   Play,
@@ -114,9 +115,10 @@ function parseAnsi(text: string): AnsiSegment[] {
 
 export default function SshTerminalView() {
   const { socket, isConnected } = useSocket();
-  const [host, setHost] = useState('192.168.1.10');
+  const toast = useToast();
+  const [host, setHost] = useState('');
   const [port, setPort] = useState(22);
-  const [username, setUsername] = useState('raffa');
+  const [username, setUsername] = useState('');
   const [authType, setAuthType] = useState<'password' | 'privateKey'>('password');
   const [password, setPassword] = useState('');
   const [privateKey, setPrivateKey] = useState('');
@@ -160,6 +162,7 @@ export default function SshTerminalView() {
         if (data.status === 'CONNECTED') {
           setSessionStatus('CONNECTED');
           setStatusMessage(`Connected to ${username}@${data.host || host}`);
+          toast.success(`SSH Connected: ${username}@${data.host || host}`);
           setShowConfig(false);
           setTerminalOutput((prev) => [
             ...prev,
@@ -168,6 +171,7 @@ export default function SshTerminalView() {
         } else if (data.status === 'ERROR') {
           setSessionStatus('ERROR');
           setStatusMessage(data.message || 'SSH Connection Failed');
+          toast.error(data.message || 'SSH Connection Failed');
           setShowConfig(true);
           setTerminalOutput((prev) => [
             ...prev,
@@ -355,7 +359,7 @@ export default function SshTerminalView() {
                 type="text"
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
-                placeholder="192.168.1.10"
+                placeholder="Your SSH Host"
                 disabled={sessionStatus === 'CONNECTED' || sessionStatus === 'CONNECTING'}
                 className="w-full bg-[#090C16] border border-[#1E2640] rounded-xl px-3.5 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 disabled:opacity-50"
               />
@@ -383,7 +387,7 @@ export default function SshTerminalView() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="raffa"
+                placeholder="root"
                 disabled={sessionStatus === 'CONNECTED' || sessionStatus === 'CONNECTING'}
                 className="w-full bg-[#090C16] border border-[#1E2640] rounded-xl px-3.5 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 disabled:opacity-50"
               />

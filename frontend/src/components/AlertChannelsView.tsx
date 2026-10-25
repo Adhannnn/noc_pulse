@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
 import { Bell, Send, Trash2, Plus, CheckCircle2, MessageSquare, Bot } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export default function AlertChannelsView() {
   const [submitting, setSubmitting] = useState(false);
 
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   const fetchChannels = async () => {
     try {
@@ -69,15 +71,20 @@ export default function AlertChannelsView() {
       });
 
       if (res.ok) {
+        toast.success(`Alert channel "${name}" configured successfully`);
         setName('');
         setWebhookUrl('');
         setChatId('');
         setBotToken('');
         setShowAddForm(false);
         fetchChannels();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to configure alert channel');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error creating alert channel';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -89,10 +96,15 @@ export default function AlertChannelsView() {
         method: 'DELETE',
       });
       if (res.ok) {
+        toast.success('Alert channel removed successfully');
         setChannels((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to delete alert channel');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error deleting alert channel';
+      toast.error(msg);
     }
   };
 
@@ -108,11 +120,15 @@ export default function AlertChannelsView() {
       });
       if (res.ok) {
         setTestStatus((prev) => ({ ...prev, [id]: 'Sent Successfully! Check your app.' }));
+        toast.success('Test notification dispatched successfully');
       } else {
         setTestStatus((prev) => ({ ...prev, [id]: 'Failed to send test alert.' }));
+        toast.error('Failed to dispatch test notification');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setTestStatus((prev) => ({ ...prev, [id]: 'Error triggering test.' }));
+      const msg = err instanceof Error ? err.message : 'Error triggering test alert';
+      toast.error(msg);
     }
     setTimeout(() => {
       setTestStatus((prev) => {

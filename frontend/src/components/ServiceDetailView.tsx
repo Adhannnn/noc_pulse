@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { Monitor } from '@/components/MonitorCard';
 import TelemetrySparkline from '@/components/TelemetrySparkline';
 import {
@@ -35,7 +36,7 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
   // Config Edit States
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(monitor.name);
-  const [editGroup, setEditGroup] = useState(monitor.group || 'Home DC');
+  const [editGroup, setEditGroup] = useState(monitor.group || 'Default');
   const [editUrl, setEditUrl] = useState(monitor.url || '');
   const [editPort, setEditPort] = useState(monitor.port ? String(monitor.port) : '');
   const [editIntervalSec, setEditIntervalSec] = useState(monitor.intervalSec || 30);
@@ -43,6 +44,7 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +56,7 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editName,
-          group: editGroup || 'Home DC',
+          group: editGroup || 'Default',
           url: editUrl || undefined,
           port: editPort ? parseInt(editPort, 10) : undefined,
           intervalSec: Number(editIntervalSec),
@@ -63,10 +65,16 @@ export default function ServiceDetailView({ monitor, onBack }: Props) {
 
       if (res.ok) {
         setSavedMsg('Probe settings updated successfully! Precision ticker updated.');
+        toast.success('Probe settings updated successfully!');
         setIsEditing(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const msg = data.message || data.error || 'Failed to update probe settings';
+        toast.error(msg);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error updating probe settings';
+      toast.error(message);
     } finally {
       setSaving(false);
     }

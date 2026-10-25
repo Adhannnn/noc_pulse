@@ -14,7 +14,6 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
 import ServiceDetailView from '@/components/ServiceDetailView';
 import GroupDetailView from '@/components/GroupDetailView';
 import DatabasesView from '@/components/DatabasesView';
-import MtBackupView from '@/components/MtBackupView';
 import IncidentsView from '@/components/IncidentsView';
 import AlertChannelsView from '@/components/AlertChannelsView';
 import UserManagement from '@/components/UserManagement';
@@ -24,6 +23,7 @@ import DockerLogsModal from '@/components/DockerLogsModal';
 import DockerLogsView from '@/components/DockerLogsView';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import {
   Layers,
   CheckCircle2,
@@ -63,6 +63,7 @@ interface HeartbeatWsPayload {
 }
 
 export default function DashboardPage() {
+  const toast = useToast();
   const [currentTab, setCurrentTab] = useState<NOCNavSection>('OVERVIEW');
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -91,20 +92,26 @@ export default function DashboardPage() {
       setEditingGroupName(null);
       return;
     }
+    const newName = newGroupNameInput.trim();
     try {
       const res = await authFetch('/api/monitors/groups/rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldName, newName: newGroupNameInput.trim() }),
+        body: JSON.stringify({ oldName, newName }),
       });
       if (res.ok) {
+        toast.success(`Group renamed to "${newName}" successfully`);
         setEditingGroupName(null);
         setNewGroupNameInput('');
         fetchMonitors();
         fetchGroups();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to rename group');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error renaming group';
+      toast.error(message);
     }
   };
 
@@ -114,11 +121,16 @@ export default function DashboardPage() {
         method: 'DELETE',
       });
       if (res.ok) {
+        toast.success(`Service group "${groupName}" deleted successfully`);
         fetchMonitors();
         fetchGroups();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to delete service group');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error deleting group';
+      toast.error(message);
     }
   };
 
@@ -127,11 +139,8 @@ export default function DashboardPage() {
     (registeredGroups || []).forEach((g) => {
       acc[g.name] = [];
     });
-    if (Object.keys(acc).length === 0 && (monitors || []).length === 0) {
-      acc['Home DC'] = [];
-    }
     (monitors || []).forEach((m) => {
-      const gName = m.group || 'Home DC';
+      const gName = m.group || 'Default';
       if (!acc[gName]) acc[gName] = [];
       acc[gName].push(m);
     });
@@ -263,10 +272,15 @@ export default function DashboardPage() {
         method: 'DELETE',
       });
       if (res.ok) {
+        toast.success('Service probe target removed successfully');
         setMonitors((prev) => prev.filter((m) => m.id !== id));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to delete service probe');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error deleting service probe';
+      toast.error(message);
     }
   };
 
@@ -333,7 +347,6 @@ export default function DashboardPage() {
               {currentTab === 'DATABASES' && 'Databases'}
               {currentTab === 'DOCKER' && 'Docker Fleet & Logs'}
               {currentTab === 'INCIDENTS' && 'Incidents Log'}
-              {currentTab === 'MTBACKUP' && 'MT Backup Vault'}
               {currentTab === 'ALERTS' && 'Alert Integration Channels'}
               {currentTab === 'USERS' && 'User Access Directory'}
               {currentTab === 'SSH' && 'SSH Console'}
@@ -454,14 +467,14 @@ export default function DashboardPage() {
                     <div className="bg-[#121829] border border-[#1E2640] p-4 rounded-2xl flex items-center justify-between shadow-sm col-span-2 sm:col-span-1">
                       <div>
                         <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                          DATA CENTERS
+                          SERVICE GROUPS
                         </div>
                         <div className="text-2xl font-extrabold text-indigo-400 font-mono mt-1">
                           {Object.keys(groupedMonitors).length}
                         </div>
                       </div>
                       <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                        <Database className="w-5 h-5" />
+                        <Layers className="w-5 h-5" />
                       </div>
                     </div>
                   </div>
@@ -720,7 +733,6 @@ export default function DashboardPage() {
             {currentTab === 'DATABASES' && <DatabasesView key={dbKey} />}
             {currentTab === 'DOCKER' && <DockerLogsView />}
             {currentTab === 'INCIDENTS' && <IncidentsView />}
-            {currentTab === 'MTBACKUP' && <MtBackupView />}
             {currentTab === 'ALERTS' && <AlertChannelsView />}
             {currentTab === 'USERS' && <UserManagement />}
             {currentTab === 'SSH' && <SshTerminalView />}

@@ -72,41 +72,6 @@ func (h *MiscHandler) DeleteIP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// Backups
-func (h *MiscHandler) GetAllBackups(w http.ResponseWriter, r *http.Request) {
-	backups, err := h.store.GetAllBackups(r.Context())
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	writeJSON(w, http.StatusOK, backups)
-}
-
-func (h *MiscHandler) TriggerBackup(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		DeviceName string `json:"deviceName"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.DeviceName == "" {
-		body.DeviceName = "Debian Core Host"
-	}
-
-	rec := &models.BackupRecord{
-		ID:         fmt.Sprintf("bk-%s", uuid.New().String()[:8]),
-		DeviceName: body.DeviceName,
-		Filename:   fmt.Sprintf("backup-noc-%d.rsc", time.Now().Unix()),
-		SizeKB:     142,
-		Status:     "SUCCESS",
-		CreatedAt:  time.Now(),
-	}
-
-	if err := h.store.CreateBackup(r.Context(), rec); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	writeJSON(w, http.StatusCreated, rec)
-}
-
 // Alert Channels
 func (h *MiscHandler) GetAllAlertChannels(w http.ResponseWriter, r *http.Request) {
 	channels, err := h.store.GetAllAlertChannels(r.Context())

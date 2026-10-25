@@ -31,7 +31,7 @@ export default function GroupDetailView({
   isReadOnly = false,
 }: Props) {
   const groupMonitors = useMemo(() => {
-    return monitors.filter((m) => (m.group || 'Home DC') === groupName);
+    return monitors.filter((m) => (m.group || 'Default') === groupName);
   }, [monitors, groupName]);
 
   const total = groupMonitors.length;
