@@ -30,13 +30,23 @@ func main() {
 
 	cfg := config.LoadConfig()
 
-	// 1. Storage Layer (PostgreSQL)
-	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
-	if err != nil {
-		log.Printf("[Storage] Warning: Failed to connect to DB at %s: %v. Running in degraded state.", cfg.DatabaseURL, err)
-	} else {
-		log.Println("[Storage] PostgreSQL connection pool initialized and verified.")
-		defer store.Close()
+	// 1. Storage Layer (PostgreSQL) with startup retry loop to survive container reboot race condition
+	var store *storage.PostgresStore
+	var err error
+	maxRetries := 10
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		store, err = storage.NewPostgresStore(cfg.DatabaseURL)
+		if err == nil {
+			log.Printf("[Storage] PostgreSQL connection pool initialized and verified (attempt %d/%d).", attempt, maxRetries)
+			defer store.Close()
+			break
+		}
+		log.Printf("[Storage] Connection attempt %d/%d failed: %v. Retrying in 3s...", attempt, maxRetries, err)
+		time.Sleep(3 * time.Second)
+	}
+
+	if store == nil {
+		log.Printf("[Storage] Warning: Failed to connect to DB at %s after %d retries: %v. Running in degraded state.", cfg.DatabaseURL, maxRetries, err)
 	}
 
 	// 2. Auth Service
@@ -149,15 +159,6 @@ func main() {
 		// Docker Container Management & Log Streaming
 		protected.Get("/api/docker/containers", dockerHandler.ListContainers)
 		protected.HandleFunc("/api/docker/containers/{id}/logs", dockerHandler.StreamLogs)
-
-		// IP Management
-		protected.Get("/api/ip-management", miscHandler.GetAllIPs)
-		protected.Post("/api/ip-management", miscHandler.CreateIP)
-		protected.Delete("/api/ip-management/{id}", miscHandler.DeleteIP)
-
-		// Backups
-		protected.Get("/api/backups", miscHandler.GetAllBackups)
-		protected.Post("/api/backups/trigger", miscHandler.TriggerBackup)
 
 		// Alert Channels
 		protected.Get("/api/alerts/channels", miscHandler.GetAllAlertChannels)

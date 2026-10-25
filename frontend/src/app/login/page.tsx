@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { getApiBaseUrl } from '@/lib/api-config';
 import { ShieldCheck, Lock, Mail, Radio, AlertCircle, KeyRound, Server } from 'lucide-react';
 
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +39,12 @@ export default function LoginPage() {
         throw new Error(data.message || data.error || 'Authentication failed: No access token received from server.');
       }
 
+      toast.success('Access granted. Welcome to PulseNOC.');
       login(token, data.user);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Authentication failed. Access denied.';
       setError(message);
+      toast.error(message, 'Authorization Failure');
     } finally {
       setSubmitting(false);
     }

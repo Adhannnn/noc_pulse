@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
 import { Users, UserPlus, Shield, Trash2, KeyRound, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -29,6 +30,7 @@ export default function UserManagement() {
   const [submitting, setSubmitting] = useState(false);
 
   const { authFetch, user: currentUser } = useAuth();
+  const toast = useToast();
 
   const fetchUsers = async () => {
     try {
@@ -66,14 +68,17 @@ export default function UserManagement() {
         throw new Error(data.message || 'Failed to create user');
       }
 
+      toast.success(`User "${name}" created successfully`);
       setName('');
       setEmail('');
       setPassword('');
       setRole('OPERATOR');
       setShowAddForm(false);
       fetchUsers();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create user';
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +89,7 @@ export default function UserManagement() {
     setError(null);
     try {
       const res = await authFetch(`/api/auth/users/${userId}/role`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       });
@@ -92,9 +97,12 @@ export default function UserManagement() {
       if (!res.ok) {
         throw new Error(data.message || 'Failed to update user role');
       }
+      toast.success(`User role updated to ${newRole}`);
       fetchUsers();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update user role';
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -111,9 +119,12 @@ export default function UserManagement() {
         throw new Error(data.message || 'Failed to delete user');
       }
 
+      toast.success('User account removed successfully');
       setUsers((prev) => prev.filter((item) => item.id !== id));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete user';
+      setError(message);
+      toast.error(message);
     }
   };
 

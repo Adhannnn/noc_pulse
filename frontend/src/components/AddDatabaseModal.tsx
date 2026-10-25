@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { X, Database, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -24,6 +25,7 @@ export default function AddDatabaseModal({ isOpen, onClose, onSuccess }: Props) 
   const [loading, setLoading] = useState(false);
 
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   if (!isOpen) return null;
 
@@ -60,8 +62,15 @@ export default function AddDatabaseModal({ isOpen, onClose, onSuccess }: Props) 
       });
       const data = await res.json();
       setTestResult(data);
-    } catch (err: any) {
-      setTestResult({ success: false, message: 'Failed to connect to database host.' });
+      if (data?.success) {
+        toast.success(data.message || 'Database connection successful!');
+      } else {
+        toast.error(data?.message || 'Database connection test failed');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to connect to database host.';
+      setTestResult({ success: false, message: msg });
+      toast.error(msg);
     } finally {
       setTesting(false);
     }
@@ -87,15 +96,20 @@ export default function AddDatabaseModal({ isOpen, onClose, onSuccess }: Props) 
       });
 
       if (res.ok) {
+        toast.success(`Database connection "${name}" added successfully`);
         setName('');
         setHost('');
         setPassword('');
         setTestResult(null);
         onSuccess();
         onClose();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to add database connection');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error adding database';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

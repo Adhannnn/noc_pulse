@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { DatabaseRecord } from '@/components/DatabaseConsoleModal';
 import {
   ArrowLeft,
@@ -41,7 +42,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
   const [query, setQuery] = useState('SELECT * FROM users LIMIT 10;');
   const [queryResults, setQueryResults] = useState<{
     columns: string[];
-    rows: any[];
+    rows: Record<string, unknown>[];
     rowCount: number;
     durationMs: number;
   } | null>(null);
@@ -49,6 +50,7 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
   const [tableSearch, setTableSearch] = useState('');
 
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   // Helper to format any column value without throwing
   const renderCell = (val: unknown): React.ReactNode => {
@@ -140,15 +142,28 @@ export default function DatabaseDetailView({ db, onBack }: Props) {
       });
       if (res.ok) {
         const data = await res.json();
+        const duration = typeof data?.durationMs === 'number' ? data.durationMs : 0;
+        const count =
+          typeof data?.rowCount === 'number'
+            ? data.rowCount
+            : Array.isArray(data?.rows)
+            ? data.rows.length
+            : 0;
         setQueryResults({
           columns: Array.isArray(data?.columns) ? data.columns : [],
           rows: Array.isArray(data?.rows) ? data.rows : [],
-          rowCount: typeof data?.rowCount === 'number' ? data.rowCount : (Array.isArray(data?.rows) ? data.rows.length : 0),
-          durationMs: typeof data?.durationMs === 'number' ? data.durationMs : 0,
+          rowCount: count,
+          durationMs: duration,
         });
+        toast.success(`Query executed in ${duration}ms (${count} rows)`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const msg = errData.error || errData.message || 'SQL query execution failed';
+        toast.error(msg);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Database query execution failed';
+      toast.error(msg);
     } finally {
       setExecuting(false);
     }

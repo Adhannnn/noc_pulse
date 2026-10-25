@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -17,7 +18,7 @@ export default function AddMonitorModal({ isOpen, onClose, onSuccess, defaultGro
   const [type, setType] = useState('HTTP');
   const [url, setUrl] = useState('');
   const [port, setPort] = useState('');
-  const [group, setGroup] = useState(defaultGroup || 'Home DC');
+  const [group, setGroup] = useState(defaultGroup || 'Default');
 
   React.useEffect(() => {
     if (defaultGroup) {
@@ -27,6 +28,7 @@ export default function AddMonitorModal({ isOpen, onClose, onSuccess, defaultGro
   const [intervalSec, setIntervalSec] = useState(30);
   const [loading, setLoading] = useState(false);
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   if (!isOpen) return null;
 
@@ -43,21 +45,26 @@ export default function AddMonitorModal({ isOpen, onClose, onSuccess, defaultGro
           type,
           url: url || undefined,
           port: port ? parseInt(port, 10) : undefined,
-          group: group || 'Home DC',
+          group: group || 'Default',
           intervalSec: Number(intervalSec),
         }),
       });
 
       if (res.ok) {
+        toast.success(`Service probe target "${name}" registered successfully`);
         setName('');
         setUrl('');
         setPort('');
-        setGroup('Home DC');
+        setGroup(defaultGroup || 'Default');
         onSuccess();
         onClose();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to register service probe');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error registering service probe';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -92,13 +99,12 @@ export default function AddMonitorModal({ isOpen, onClose, onSuccess, defaultGro
               type="text"
               disabled
               list="existing-groups-list"
-              placeholder="e.g. Home DC, Production Cluster, Edge Gateway"
+              placeholder="e.g. Production Cluster, Edge Gateway"
               value={group}
               onChange={(e) => setGroup(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 font-mono"
             />
             <datalist id="existing-groups-list">
-              <option value="Home DC" />
               <option value="Production Cluster" />
               <option value="Database Nodes" />
               <option value="Edge Gateway" />

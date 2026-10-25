@@ -46,7 +46,7 @@ export default function ServerInfoCard() {
   }, []);
 
   const hostname = info?.hostname || '-';
-  const os = info?.os || info?.platform || 'Linux';
+  const os = info?.os || info?.platform || '-';
   const kernel = info?.kernel || info?.kernelVersion || '-';
   const uptime = formatUptimeStr(info?.uptime || info?.uptimeSeconds);
   const cpuCores = info?.cpuCores || (info?.cpuCount ? `${info.cpuCount} Cores` : '-');

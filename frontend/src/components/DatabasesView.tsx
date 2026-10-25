@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import AddDatabaseModal from '@/components/AddDatabaseModal';
 import DatabaseDetailView from '@/components/DatabaseDetailView';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
@@ -17,6 +18,7 @@ export default function DatabasesView() {
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
 
   const { authFetch } = useAuth();
+  const toast = useToast();
 
   const fetchDatabases = async () => {
     try {
@@ -43,9 +45,14 @@ export default function DatabasesView() {
       });
       if (res.ok) {
         setDatabases((prev) => prev.filter((d) => d.id !== id));
+        toast.success('Database instance disconnected successfully');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to disconnect database instance');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error disconnecting database';
+      toast.error(msg);
     }
   };
 
