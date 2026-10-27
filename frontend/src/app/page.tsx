@@ -6,7 +6,7 @@ import Sidebar, { NOCNavSection } from '@/components/Sidebar';
 import ServerInfoCard from '@/components/ServerInfoCard';
 import CircularGauge from '@/components/CircularGauge';
 import TelemetrySparkline from '@/components/TelemetrySparkline';
-import MonitorCard, { Monitor } from '@/components/MonitorCard';
+import MonitorCard, { Monitor, SSLCertificateInfo } from '@/components/MonitorCard';
 import AddMonitorModal from '@/components/AddMonitorModal';
 import AddDatabaseModal from '@/components/AddDatabaseModal';
 import AddGroupModal from '@/components/AddGroupModal';
@@ -73,6 +73,7 @@ interface HeartbeatWsPayload {
   statusCode?: number;
   timestamp: string;
   uptimePercent24h?: number;
+  sslCert?: SSLCertificateInfo;
 }
 
 export default function DashboardPage() {
@@ -248,6 +249,15 @@ export default function DashboardPage() {
       setMonitors((prev) =>
         prev.map((m) => {
           if (m.id === data.monitorId) {
+            // Trigger operational toast on status transition
+            if (m.currentStatus !== data.status) {
+              if (data.status === 'DOWN') {
+                toast.error(`🚨 OUTAGE: ${m.name} is DOWN!`);
+              } else if (data.status === 'UP' && (m.currentStatus === 'DOWN' || m.currentStatus === 'DEGRADED')) {
+                toast.success(`✅ RECOVERY: ${m.name} is back UP!`);
+              }
+            }
+
             const newHb = {
               id: `${Date.now()}`,
               status: data.status,
@@ -259,6 +269,7 @@ export default function DashboardPage() {
               ...m,
               currentStatus: data.status,
               uptimePercent24h: data.uptimePercent24h ?? m.uptimePercent24h,
+              sslCert: data.sslCert || m.sslCert,
               heartbeats: [newHb, ...(m.heartbeats || []).slice(0, 29)],
             };
             if (selectedMonitor && selectedMonitor.id === m.id) {
@@ -275,7 +286,7 @@ export default function DashboardPage() {
       socket.off('metrics:host');
       socket.off('monitors:heartbeat');
     };
-  }, [socket, selectedMonitor]);
+  }, [socket, selectedMonitor, toast]);
 
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 

@@ -2,16 +2,47 @@ package storage
 
 import (
 	"context"
+	"time"
 
 	"pulsenoc/backend/internal/models"
 )
+
+func derefString(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+func derefTime(t *time.Time) time.Time {
+	if t != nil {
+		return *t
+	}
+	return time.Time{}
+}
+
+func derefInt(i *int) int {
+	if i != nil {
+		return *i
+	}
+	return 0
+}
+
+func derefBool(b *bool) bool {
+	if b != nil {
+		return *b
+	}
+	return false
+}
 
 // Monitors
 func (s *PostgresStore) GetAllMonitors(ctx context.Context) ([]models.Monitor, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, type, url, port, "group", "intervalSec", "timeoutSec",
 		       "isActive", "currentStatus", "uptimePercent24h", "lastProbedAt",
-		       "dataCenterId", "createdAt", "updatedAt"
+		       "dataCenterId", "createdAt", "updatedAt",
+		       "sslIssuer", "sslSubject", "sslValidFrom", "sslValidTo",
+		       "sslDaysRemaining", "sslIsExpired", "sslWarningTrigger"
 		FROM monitors
 		ORDER BY "createdAt" ASC
 	`)
@@ -23,13 +54,33 @@ func (s *PostgresStore) GetAllMonitors(ctx context.Context) ([]models.Monitor, e
 	var list []models.Monitor
 	for rows.Next() {
 		var m models.Monitor
+		var sslIssuer, sslSubject *string
+		var sslValidFrom, sslValidTo *time.Time
+		var sslDaysRemaining *int
+		var sslIsExpired, sslWarningTrigger *bool
+
 		if err := rows.Scan(
 			&m.ID, &m.Name, &m.Type, &m.URL, &m.Port, &m.Group, &m.IntervalSec, &m.TimeoutSec,
 			&m.IsActive, &m.CurrentStatus, &m.UptimePercent24h, &m.LastProbedAt,
 			&m.DataCenterID, &m.CreatedAt, &m.UpdatedAt,
+			&sslIssuer, &sslSubject, &sslValidFrom, &sslValidTo,
+			&sslDaysRemaining, &sslIsExpired, &sslWarningTrigger,
 		); err != nil {
 			return nil, err
 		}
+
+		if sslIssuer != nil || sslValidTo != nil {
+			m.SSLCert = &models.SSLCertificateInfo{
+				Issuer:         derefString(sslIssuer),
+				Subject:        derefString(sslSubject),
+				ValidFrom:      derefTime(sslValidFrom),
+				ValidTo:        derefTime(sslValidTo),
+				DaysRemaining:  derefInt(sslDaysRemaining),
+				IsExpired:      derefBool(sslIsExpired),
+				WarningTrigger: derefBool(sslWarningTrigger),
+			}
+		}
+
 		m.Heartbeats = []models.Heartbeat{}
 		list = append(list, m)
 	}
@@ -59,19 +110,40 @@ func (s *PostgresStore) GetAllMonitors(ctx context.Context) ([]models.Monitor, e
 
 func (s *PostgresStore) GetMonitorByID(ctx context.Context, id string) (*models.Monitor, error) {
 	var m models.Monitor
+	var sslIssuer, sslSubject *string
+	var sslValidFrom, sslValidTo *time.Time
+	var sslDaysRemaining *int
+	var sslIsExpired, sslWarningTrigger *bool
+
 	row := s.pool.QueryRow(ctx, `
 		SELECT id, name, type, url, port, "group", "intervalSec", "timeoutSec",
 		       "isActive", "currentStatus", "uptimePercent24h", "lastProbedAt",
-		       "dataCenterId", "createdAt", "updatedAt"
+		       "dataCenterId", "createdAt", "updatedAt",
+		       "sslIssuer", "sslSubject", "sslValidFrom", "sslValidTo",
+		       "sslDaysRemaining", "sslIsExpired", "sslWarningTrigger"
 		FROM monitors WHERE id = $1
 	`, id)
 	err := row.Scan(
 		&m.ID, &m.Name, &m.Type, &m.URL, &m.Port, &m.Group, &m.IntervalSec, &m.TimeoutSec,
 		&m.IsActive, &m.CurrentStatus, &m.UptimePercent24h, &m.LastProbedAt,
 		&m.DataCenterID, &m.CreatedAt, &m.UpdatedAt,
+		&sslIssuer, &sslSubject, &sslValidFrom, &sslValidTo,
+		&sslDaysRemaining, &sslIsExpired, &sslWarningTrigger,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if sslIssuer != nil || sslValidTo != nil {
+		m.SSLCert = &models.SSLCertificateInfo{
+			Issuer:         derefString(sslIssuer),
+			Subject:        derefString(sslSubject),
+			ValidFrom:      derefTime(sslValidFrom),
+			ValidTo:        derefTime(sslValidTo),
+			DaysRemaining:  derefInt(sslDaysRemaining),
+			IsExpired:      derefBool(sslIsExpired),
+			WarningTrigger: derefBool(sslWarningTrigger),
+		}
 	}
 
 	m.Heartbeats = []models.Heartbeat{}
@@ -94,6 +166,20 @@ func (s *PostgresStore) GetMonitorByID(ctx context.Context, id string) (*models.
 	}
 
 	return &m, nil
+}
+
+func (s *PostgresStore) UpdateMonitorSSL(ctx context.Context, id string, cert *models.SSLCertificateInfo) error {
+	if cert == nil {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx, `
+		UPDATE monitors
+		SET "sslIssuer" = $1, "sslSubject" = $2, "sslValidFrom" = $3,
+		    "sslValidTo" = $4, "sslDaysRemaining" = $5, "sslIsExpired" = $6,
+		    "sslWarningTrigger" = $7, "updatedAt" = NOW()
+		WHERE id = $8
+	`, cert.Issuer, cert.Subject, cert.ValidFrom, cert.ValidTo, cert.DaysRemaining, cert.IsExpired, cert.WarningTrigger, id)
+	return err
 }
 
 func (s *PostgresStore) CreateMonitor(ctx context.Context, m *models.Monitor) error {
@@ -203,4 +289,21 @@ func (s *PostgresStore) GetAllIncidents(ctx context.Context) ([]models.Incident,
 		list = append(list, inc)
 	}
 	return list, nil
+}
+
+func (s *PostgresStore) CreateIncident(ctx context.Context, inc *models.Incident) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO incidents (id, "monitorId", title, description, severity, status, "startedAt", "resolvedAt")
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, inc.ID, inc.MonitorID, inc.Title, inc.Description, inc.Severity, inc.Status, inc.StartedAt, inc.ResolvedAt)
+	return err
+}
+
+func (s *PostgresStore) ResolveMonitorIncidents(ctx context.Context, monitorID string) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE incidents
+		SET status = 'RESOLVED', "resolvedAt" = NOW()
+		WHERE "monitorId" = $1 AND status != 'RESOLVED'
+	`, monitorID)
+	return err
 }
