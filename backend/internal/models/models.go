@@ -87,19 +87,46 @@ type Heartbeat struct {
 	Timestamp    time.Time     `json:"timestamp"`
 }
 
+type HostThermalInfo struct {
+	CPUTempC      *float64 `json:"cpuTempC,omitempty"`
+	IsThrottling  bool     `json:"isThrottling"`
+	ThermalStatus string   `json:"thermalStatus"` // NORMAL, WARM, CRITICAL
+}
+
+type HostBatteryInfo struct {
+	HasBattery bool   `json:"hasBattery"`
+	Percentage int    `json:"percentage"`
+	Status     string `json:"status"` // Charging, Discharging, Full, AC Connected
+	IsCharging bool   `json:"isCharging"`
+	ACOnline   bool   `json:"acOnline"`
+}
+
+type ProcessInfo struct {
+	PID        int32   `json:"pid"`
+	Name       string  `json:"name"`
+	Username   string  `json:"username"`
+	CPUPercent float64 `json:"cpuPercent"`
+	MemPercent float32 `json:"memPercent"`
+	MemRSSMB   float64 `json:"memRssMb"`
+	Status     string  `json:"status"`
+	Cmdline    string  `json:"cmdline"`
+}
+
 type HostMetric struct {
-	ID           string    `json:"id"`
-	CPUUsage     float64   `json:"cpuUsage"`
-	RAMUsedMB    float64   `json:"ramUsedMb"`
-	RAMTotalMB   float64   `json:"ramTotalMb"`
-	DiskUsagePct float64   `json:"diskUsagePct"`
-	DiskUsedGB   float64   `json:"diskUsedGb"`
-	DiskTotalGB  float64   `json:"diskTotalGb"`
-	DiskReadKB   float64   `json:"diskReadKb"`
-	DiskWriteKB  float64   `json:"diskWriteKb"`
-	NetworkInKB  float64   `json:"networkInKb"`
-	NetworkOutKB float64   `json:"networkOutKb"`
-	Timestamp    time.Time `json:"timestamp"`
+	ID           string           `json:"id"`
+	CPUUsage     float64          `json:"cpuUsage"`
+	RAMUsedMB    float64          `json:"ramUsedMb"`
+	RAMTotalMB   float64          `json:"ramTotalMb"`
+	DiskUsagePct float64          `json:"diskUsagePct"`
+	DiskUsedGB   float64          `json:"diskUsedGb"`
+	DiskTotalGB  float64          `json:"diskTotalGb"`
+	DiskReadKB   float64          `json:"diskReadKb"`
+	DiskWriteKB  float64          `json:"diskWriteKb"`
+	NetworkInKB  float64          `json:"networkInKb"`
+	NetworkOutKB float64          `json:"networkOutKb"`
+	CPUTempC     *float64         `json:"cpuTempC,omitempty"`
+	Battery      *HostBatteryInfo `json:"battery,omitempty"`
+	Timestamp    time.Time        `json:"timestamp"`
 }
 
 type ServiceGroup struct {

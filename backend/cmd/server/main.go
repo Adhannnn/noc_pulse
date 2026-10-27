@@ -133,6 +133,8 @@ func main() {
 		protected.Get("/api/metrics/history", metricsHandler.GetHistory)
 		protected.Get("/api/metrics/server-info", metricsHandler.GetServerInfo)
 		protected.Get("/api/metrics/memory-detail", metricsHandler.GetMemoryDetail)
+		protected.Get("/api/metrics/processes", metricsHandler.GetProcesses)
+		protected.Post("/api/metrics/processes/{pid}/kill", metricsHandler.KillProcess)
 
 		// Monitors & Groups
 		protected.Get("/api/monitors", monitorsHandler.GetAllMonitors)
