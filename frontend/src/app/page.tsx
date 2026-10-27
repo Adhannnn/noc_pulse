@@ -542,7 +542,10 @@ export default function DashboardPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
                     <div className="lg:col-span-4">
-                      <ServerInfoCard />
+                      <ServerInfoCard
+                        liveCpuTempC={hostMetrics?.cpuTempC}
+                        liveBattery={hostMetrics?.battery}
+                      />
                     </div>
                     <div className="lg:col-span-4">
                       <CircularGauge

@@ -32,6 +32,17 @@ interface ServerInfoData {
   };
 }
 
+interface ServerInfoCardProps {
+  liveCpuTempC?: number;
+  liveBattery?: {
+    hasBattery?: boolean;
+    percentage?: number;
+    status?: string;
+    isCharging?: boolean;
+    acOnline?: boolean;
+  };
+}
+
 function formatUptimeStr(uptime: string | number | undefined): string {
   if (uptime === undefined || uptime === null) return '-';
   if (typeof uptime === 'string' && isNaN(Number(uptime))) return uptime;
@@ -44,7 +55,7 @@ function formatUptimeStr(uptime: string | number | undefined): string {
   return `${m}m`;
 }
 
-export default function ServerInfoCard() {
+export default function ServerInfoCard({ liveCpuTempC, liveBattery }: ServerInfoCardProps = {}) {
   const [info, setInfo] = useState<ServerInfoData | null>(null);
   const { authFetch } = useAuth();
 
@@ -67,6 +78,9 @@ export default function ServerInfoCard() {
     (Array.isArray(info?.ipAddresses) && info.ipAddresses.length > 0
       ? info.ipAddresses[0]
       : '-');
+
+  const currentTemp = liveCpuTempC !== undefined ? liveCpuTempC : info?.thermals?.cpuTempC;
+  const currentBattery = liveBattery || info?.battery;
 
   return (
     <div className="bg-[#121829] border border-[#1E2640] rounded-2xl p-5 shadow-sm text-slate-100 flex flex-col justify-between h-full font-sans">
@@ -123,22 +137,22 @@ export default function ServerInfoCard() {
             </span>
             <span
               className={`font-semibold ${
-                (info.thermals?.cpuTempC ?? 0) >= 80
+                (currentTemp ?? 0) >= 80
                   ? 'text-rose-400 animate-pulse'
-                  : (info.thermals?.cpuTempC ?? 0) >= 65
+                  : (currentTemp ?? 0) >= 65
                   ? 'text-amber-400'
                   : 'text-emerald-400'
               }`}
             >
-              {info.thermals?.cpuTempC ? `${info.thermals.cpuTempC.toFixed(1)} °C` : '-'}
+              {currentTemp !== undefined && currentTemp > 0 ? `${currentTemp.toFixed(1)} °C` : '-'}
             </span>
           </div>
 
           <div className="flex items-center justify-between border-b border-[#1E2640]/60 pb-2">
             <span className="text-slate-400 flex items-center gap-1.5">
-              {info.battery?.isCharging ? (
+              {currentBattery?.isCharging ? (
                 <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
-              ) : info.battery?.hasBattery ? (
+              ) : currentBattery?.hasBattery ? (
                 <Battery className="w-3.5 h-3.5 text-cyan-400" />
               ) : (
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
@@ -146,9 +160,9 @@ export default function ServerInfoCard() {
               Power State
             </span>
             <span className="font-semibold text-slate-200">
-              {info.battery?.hasBattery
-                ? `${info.battery.percentage}% (${info.battery.status})`
-                : info.battery?.acOnline
+              {currentBattery?.hasBattery
+                ? `${currentBattery.percentage}% (${currentBattery.status})`
+                : currentBattery?.acOnline
                 ? 'AC Connected'
                 : '-'}
             </span>
