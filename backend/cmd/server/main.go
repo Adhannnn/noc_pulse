@@ -105,6 +105,7 @@ func main() {
 	databasesHandler := api.NewDatabasesHandler(store)
 	dockerHandler := api.NewDockerHandler(dockerSvc)
 	miscHandler := api.NewMiscHandler(store)
+	publicHandler := api.NewPublicHandler(store)
 
 	// WebSocket endpoint
 	r.HandleFunc("/ws", wsHub.ServeWS)
@@ -118,8 +119,9 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"UP","engine":"golang","version":"2.0.0"}`))
 	})
 
-	// Public Routes
+	// Public Routes (Unauthenticated)
 	r.Post("/api/auth/login", authHandler.Login)
+	r.Get("/api/public/status", publicHandler.GetPublicStatus)
 
 	// Protected Routes
 	r.Group(func(protected chi.Router) {
