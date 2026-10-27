@@ -15,21 +15,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pulsenoc/backend/internal/alerting"
 	"pulsenoc/backend/internal/models"
 	"pulsenoc/backend/internal/storage"
 	"pulsenoc/backend/internal/websocket"
 )
 
 type ProberEngine struct {
-	store *storage.PostgresStore
-	hub   *websocket.Hub
-	mu    sync.RWMutex
+	store           *storage.PostgresStore
+	hub             *websocket.Hub
+	alertDispatcher *alerting.AlertDispatcher
+	mu              sync.RWMutex
 }
 
-func NewProberEngine(store *storage.PostgresStore, hub *websocket.Hub) *ProberEngine {
+func NewProberEngine(store *storage.PostgresStore, hub *websocket.Hub, alertDispatcher *alerting.AlertDispatcher) *ProberEngine {
 	return &ProberEngine{
-		store: store,
-		hub:   hub,
+		store:           store,
+		hub:             hub,
+		alertDispatcher: alertDispatcher,
 	}
 }
 
@@ -79,6 +82,8 @@ func (p *ProberEngine) ProbeSingle(ctx context.Context, m *models.Monitor) {
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	prevStatus := m.CurrentStatus
+
 	var hb *models.Heartbeat
 	switch m.Type {
 	case models.MonitorTypeTCP:
@@ -89,19 +94,45 @@ func (p *ProberEngine) ProbeSingle(ctx context.Context, m *models.Monitor) {
 		hb = p.probeHTTP(probeCtx, m)
 	}
 
-	// Persist heartbeat in PostgreSQL
-	saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	_ = p.store.RecordHeartbeat(saveCtx, hb)
-	saveCancel()
+	// Persist heartbeat & SSL update in PostgreSQL
+	if p.store != nil {
+		saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = p.store.RecordHeartbeat(saveCtx, hb)
+		if m.SSLCert != nil {
+			_ = p.store.UpdateMonitorSSL(saveCtx, m.ID, m.SSLCert)
+		}
+		saveCancel()
+	}
+
+	// Automated Alert Dispatch on state changes & SSL warnings
+	if p.alertDispatcher != nil {
+		errMsg := ""
+		if hb.ErrorMessage != nil {
+			errMsg = *hb.ErrorMessage
+		}
+		p.alertDispatcher.DispatchStateChange(ctx, m, prevStatus, hb.Status, errMsg)
+
+		if m.SSLCert != nil && (m.SSLCert.WarningTrigger || m.SSLCert.IsExpired) {
+			p.alertDispatcher.DispatchSSLWarning(ctx, m, m.SSLCert)
+		}
+	}
+
+	m.CurrentStatus = hb.Status
 
 	// Broadcast via WebSocket to dashboard
-	p.hub.Broadcast("monitors:heartbeat", map[string]interface{}{
-		"monitorId":  hb.MonitorID,
-		"status":     hb.Status,
-		"latencyMs":  hb.LatencyMs,
-		"statusCode": hb.StatusCode,
-		"timestamp":  hb.Timestamp,
-	})
+	if p.hub != nil {
+		payload := map[string]interface{}{
+			"monitorId":  hb.MonitorID,
+			"status":     hb.Status,
+			"latencyMs":  hb.LatencyMs,
+			"statusCode": hb.StatusCode,
+			"timestamp":  hb.Timestamp,
+		}
+		if m.SSLCert != nil {
+			payload["sslCert"] = m.SSLCert
+		}
+		p.hub.Broadcast("monitors:heartbeat", payload)
+	}
 }
 
 // HTTP Probe with NOC-Grade Waterfall Timing and SSL Inspection

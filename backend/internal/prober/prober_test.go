@@ -25,3 +25,10 @@ func TestProberEngine_ClassifyNetworkError(t *testing.T) {
 		}
 	}
 }
+
+func TestNewProberEngine(t *testing.T) {
+	eng := NewProberEngine(nil, nil, nil)
+	if eng == nil {
+		t.Fatal("Expected non-nil ProberEngine")
+	}
+}

@@ -205,6 +205,13 @@ func (s *PostgresStore) autoMigrate(ctx context.Context) error {
 			status VARCHAR(50) DEFAULT 'SUCCESS',
 			"createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 		);`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslIssuer" VARCHAR(255);`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslSubject" VARCHAR(255);`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslValidFrom" TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslValidTo" TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslDaysRemaining" INT;`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslIsExpired" BOOLEAN DEFAULT false;`,
+		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslWarningTrigger" BOOLEAN DEFAULT false;`,
 	}
 
 	for _, q := range queries {

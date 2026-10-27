@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"pulsenoc/backend/internal/alerting"
 	"pulsenoc/backend/internal/api"
 	"pulsenoc/backend/internal/auth"
 	"pulsenoc/backend/internal/config"
@@ -62,10 +63,11 @@ func main() {
 	defer cancel()
 	go hwCollector.Start(ctx)
 
-	// 5. Network Prober Engine
+	// 5. Automated Alert Dispatcher & Network Prober Engine
+	alertDispatcher := alerting.NewAlertDispatcher(store, cfg)
 	var proberEng *prober.ProberEngine
 	if store != nil {
-		proberEng = prober.NewProberEngine(store, wsHub)
+		proberEng = prober.NewProberEngine(store, wsHub, alertDispatcher)
 		go proberEng.Start(ctx)
 	}
 
