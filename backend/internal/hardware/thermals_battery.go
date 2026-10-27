@@ -6,43 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"pulsenoc/backend/internal/models"
 )
 
 func GetThermals() models.HostThermalInfo {
-	// 1. Try gopsutil SensorsTemperatures
-	temps, err := host.SensorsTemperatures()
-	if err == nil && len(temps) > 0 {
-		var maxTemp float64
-		var count int
-		for _, t := range temps {
-			if t.Temperature > 0 && t.Temperature < 125 {
-				if t.Temperature > maxTemp {
-					maxTemp = t.Temperature
-				}
-				count++
-			}
-		}
-		if count > 0 {
-			status := "NORMAL"
-			throttling := false
-			if maxTemp >= 85 {
-				status = "CRITICAL"
-				throttling = true
-			} else if maxTemp >= 70 {
-				status = "WARM"
-			}
-			rounded := roundTwoDecimals(maxTemp)
-			return models.HostThermalInfo{
-				CPUTempC:      &rounded,
-				IsThrottling:  throttling,
-				ThermalStatus: status,
-			}
-		}
-	}
-
-	// 2. Direct Linux sysfs fallback: /sys/class/thermal or /host/sys/class/thermal
+	// Direct Linux sysfs reading: /sys/class/thermal or /host/sys/class/thermal
 	basePaths := []string{"/sys/class/thermal", "/host/sys/class/thermal"}
 	for _, basePath := range basePaths {
 		if _, err := os.Stat(basePath); err == nil {
