@@ -16,6 +16,7 @@ import {
   Box,
   ChevronLeft,
   ChevronRight,
+  Activity,
 } from 'lucide-react';
 
 export type NOCNavSection =
@@ -23,6 +24,7 @@ export type NOCNavSection =
   | 'SERVICES'
   | 'DATABASES'
   | 'DOCKER'
+  | 'PROCESSES'
   | 'INCIDENTS'
   | 'ALERTS'
   | 'USERS'
@@ -80,6 +82,12 @@ const NAV_CATEGORIES: NavCategory[] = [
         label: 'Docker Logs',
         icon: Box,
         iconColor: 'text-sky-400',
+      },
+      {
+        id: 'PROCESSES',
+        label: 'Process Explorer',
+        icon: Activity,
+        iconColor: 'text-rose-400',
       },
       {
         id: 'SSH',

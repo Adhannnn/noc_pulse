@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,15 @@ import (
 	"pulsenoc/backend/internal/storage"
 	"pulsenoc/backend/internal/websocket"
 )
+
+func init() {
+	if _, err := os.Stat("/host/proc"); err == nil {
+		os.Setenv("HOST_PROC", "/host/proc")
+	}
+	if _, err := os.Stat("/host/sys"); err == nil {
+		os.Setenv("HOST_SYS", "/host/sys")
+	}
+}
 
 type HardwareCollector struct {
 	store       *storage.PostgresStore
@@ -143,6 +153,9 @@ func (c *HardwareCollector) Collect() (*models.HostMetric, error) {
 	}
 	c.lastChecked = now
 
+	thermal := GetThermals()
+	battery := GetBattery()
+
 	return &models.HostMetric{
 		ID:           fmt.Sprintf("hm-%s", uuid.New().String()[:8]),
 		CPUUsage:     roundTwoDecimals(cpuUsage),
@@ -155,6 +168,8 @@ func (c *HardwareCollector) Collect() (*models.HostMetric, error) {
 		DiskWriteKB:  roundTwoDecimals(diskWriteKB),
 		NetworkInKB:  roundTwoDecimals(netInKB),
 		NetworkOutKB: roundTwoDecimals(netOutKB),
+		CPUTempC:     thermal.CPUTempC,
+		Battery:      &battery,
 		Timestamp:    now,
 	}, nil
 }
@@ -241,6 +256,8 @@ func (c *HardwareCollector) GetServerInfo() (map[string]interface{}, error) {
 		"cpuModel":        cpuModel,
 		"ipAddress":       primaryIP,
 		"ipAddresses":     ips,
+		"thermals":        GetThermals(),
+		"battery":         GetBattery(),
 	}, nil
 }
 

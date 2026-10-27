@@ -19,6 +19,7 @@ import AlertChannelsView from '@/components/AlertChannelsView';
 import UserManagement from '@/components/UserManagement';
 import MemoryDetailView from '@/components/MemoryDetailView';
 import SshTerminalView from '@/components/SshTerminalView';
+import ProcessExplorerView from '@/components/ProcessExplorerView';
 import DockerLogsModal from '@/components/DockerLogsModal';
 import DockerLogsView from '@/components/DockerLogsView';
 import { useSocket } from '@/hooks/useSocket';
@@ -37,6 +38,10 @@ import {
   Trash2,
   FolderPlus,
   Terminal,
+  Activity,
+  Thermometer,
+  Battery,
+  BatteryCharging,
 } from 'lucide-react';
 
 // diskReadKb/diskWriteKb opsional — hanya terisi kalau backend sudah kirim (lihat opsi 2 di bawah)
@@ -51,6 +56,14 @@ interface HostMetric {
   networkOutKb: number;
   diskReadKb?: number;
   diskWriteKb?: number;
+  cpuTempC?: number;
+  battery?: {
+    hasBattery: boolean;
+    percentage: number;
+    status: string;
+    isCharging: boolean;
+    acOnline: boolean;
+  };
 }
 
 interface HeartbeatWsPayload {
@@ -346,6 +359,7 @@ export default function DashboardPage() {
               {currentTab === 'SERVICES' && 'Services'}
               {currentTab === 'DATABASES' && 'Databases'}
               {currentTab === 'DOCKER' && 'Docker Fleet & Logs'}
+              {currentTab === 'PROCESSES' && 'Host Process Explorer'}
               {currentTab === 'INCIDENTS' && 'Incidents Log'}
               {currentTab === 'ALERTS' && 'Alert Integration Channels'}
               {currentTab === 'USERS' && 'User Access Directory'}
@@ -356,14 +370,50 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {currentTab === 'OVERVIEW' && (
-              <button
-                onClick={() => setCurrentTab('DOCKER')}
-                className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
-              >
-                <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Docker Logs
-              </button>
+              <>
+                {hostMetrics?.cpuTempC !== undefined && (
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${
+                      hostMetrics.cpuTempC >= 80
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 animate-pulse'
+                        : hostMetrics.cpuTempC >= 65
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    }`}
+                    title="Debian Host CPU Temperature"
+                  >
+                    <Thermometer className="w-3.5 h-3.5" />
+                    {hostMetrics.cpuTempC.toFixed(1)}°C
+                  </div>
+                )}
+                {hostMetrics?.battery?.hasBattery && (
+                  <div
+                    className="flex items-center gap-1.5 bg-[#161C2E] border border-[#2B3555] text-cyan-300 px-3 py-1.5 rounded-xl text-xs font-mono font-bold"
+                    title={`Battery: ${hostMetrics.battery.status}`}
+                  >
+                    {hostMetrics.battery.isCharging ? (
+                      <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Battery className="w-3.5 h-3.5 text-cyan-400" />
+                    )}
+                    {hostMetrics.battery.percentage}%
+                  </div>
+                )}
+                <button
+                  onClick={() => setCurrentTab('PROCESSES')}
+                  className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
+                >
+                  <Activity className="w-3.5 h-3.5 text-rose-400" /> Process Explorer
+                </button>
+                <button
+                  onClick={() => setCurrentTab('DOCKER')}
+                  className="flex items-center gap-2 bg-[#161C2E] hover:bg-[#1E2640] border border-[#2B3555] text-slate-200 px-3.5 py-2 rounded-xl font-semibold text-xs shadow-sm transition"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Docker Logs
+                </button>
+              </>
             )}
 
             {currentTab === 'SERVICES' && (
@@ -732,6 +782,7 @@ export default function DashboardPage() {
 
             {currentTab === 'DATABASES' && <DatabasesView key={dbKey} />}
             {currentTab === 'DOCKER' && <DockerLogsView />}
+            {currentTab === 'PROCESSES' && <ProcessExplorerView />}
             {currentTab === 'INCIDENTS' && <IncidentsView />}
             {currentTab === 'ALERTS' && <AlertChannelsView />}
             {currentTab === 'USERS' && <UserManagement />}

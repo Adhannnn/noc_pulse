@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Server } from 'lucide-react';
+import { Server, Thermometer, Battery, BatteryCharging, Zap } from 'lucide-react';
 
 interface ServerInfoData {
   hostname?: string;
@@ -18,6 +18,18 @@ interface ServerInfoData {
   cpuModel?: string;
   ipAddress?: string;
   ipAddresses?: string[];
+  thermals?: {
+    cpuTempC?: number;
+    isThrottling?: boolean;
+    thermalStatus?: string;
+  };
+  battery?: {
+    hasBattery?: boolean;
+    percentage?: number;
+    status?: string;
+    isCharging?: boolean;
+    acOnline?: boolean;
+  };
 }
 
 function formatUptimeStr(uptime: string | number | undefined): string {
@@ -103,6 +115,43 @@ export default function ServerInfoCard() {
           <div className="flex items-center justify-between border-b border-[#1E2640]/60 pb-2">
             <span className="text-slate-400">CPU Cores</span>
             <span className="font-semibold text-slate-200">{cpuCores}</span>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-[#1E2640]/60 pb-2">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <Thermometer className="w-3.5 h-3.5 text-rose-400" /> CPU Temp
+            </span>
+            <span
+              className={`font-semibold ${
+                (info.thermals?.cpuTempC ?? 0) >= 80
+                  ? 'text-rose-400 animate-pulse'
+                  : (info.thermals?.cpuTempC ?? 0) >= 65
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+              }`}
+            >
+              {info.thermals?.cpuTempC ? `${info.thermals.cpuTempC.toFixed(1)} °C` : '-'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-[#1E2640]/60 pb-2">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              {info.battery?.isCharging ? (
+                <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
+              ) : info.battery?.hasBattery ? (
+                <Battery className="w-3.5 h-3.5 text-cyan-400" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              Power State
+            </span>
+            <span className="font-semibold text-slate-200">
+              {info.battery?.hasBattery
+                ? `${info.battery.percentage}% (${info.battery.status})`
+                : info.battery?.acOnline
+                ? 'AC Connected'
+                : '-'}
+            </span>
           </div>
 
           <div className="flex items-center justify-between pt-0.5">
