@@ -14,6 +14,7 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/shirou/gopsutil/v4/mem"
 	netUtil "github.com/shirou/gopsutil/v4/net"
+	"pulsenoc/backend/internal/alerting"
 	"pulsenoc/backend/internal/models"
 	"pulsenoc/backend/internal/storage"
 	"pulsenoc/backend/internal/websocket"
@@ -29,14 +30,15 @@ func init() {
 }
 
 type HardwareCollector struct {
-	store       *storage.PostgresStore
-	hub         *websocket.Hub
-	totalRAMGB  int
-	lastNetIn   uint64
-	lastNetOut  uint64
-	lastDiskRd  uint64
-	lastDiskWr  uint64
-	lastChecked time.Time
+	store           *storage.PostgresStore
+	hub             *websocket.Hub
+	alertDispatcher *alerting.AlertDispatcher
+	totalRAMGB      int
+	lastNetIn       uint64
+	lastNetOut      uint64
+	lastDiskRd      uint64
+	lastDiskWr      uint64
+	lastChecked     time.Time
 }
 
 func NewHardwareCollector(store *storage.PostgresStore, hub *websocket.Hub, totalRAMGB int) *HardwareCollector {
@@ -46,6 +48,10 @@ func NewHardwareCollector(store *storage.PostgresStore, hub *websocket.Hub, tota
 		totalRAMGB:  totalRAMGB,
 		lastChecked: time.Now(),
 	}
+}
+
+func (c *HardwareCollector) SetAlertDispatcher(d *alerting.AlertDispatcher) {
+	c.alertDispatcher = d
 }
 
 func (c *HardwareCollector) Start(ctx context.Context) {
@@ -155,6 +161,25 @@ func (c *HardwareCollector) Collect() (*models.HostMetric, error) {
 
 	thermal := GetThermals()
 	battery := GetBattery()
+
+	// Anomaly Detection: Check configured thresholds and dispatch warning alerts
+	if c.alertDispatcher != nil && c.store != nil {
+		if th, err := c.store.GetAlertThresholds(context.Background()); err == nil && th.IsEnabled {
+			if cpuUsage >= float64(th.CPUPercent) {
+				c.alertDispatcher.DispatchHostThreshold(context.Background(), "CPU Usage", cpuUsage, float64(th.CPUPercent), "%")
+			}
+			ramPct := (ramUsedMB / ramTotalMB) * 100.0
+			if ramPct >= float64(th.RAMPercent) {
+				c.alertDispatcher.DispatchHostThreshold(context.Background(), "Memory RAM", ramPct, float64(th.RAMPercent), "%")
+			}
+			if diskUsagePct >= float64(th.DiskPercent) {
+				c.alertDispatcher.DispatchHostThreshold(context.Background(), "Disk Partition", diskUsagePct, float64(th.DiskPercent), "%")
+			}
+			if thermal.CPUTempC != nil && *thermal.CPUTempC >= float64(th.CPUTempC) {
+				c.alertDispatcher.DispatchHostThreshold(context.Background(), "CPU Temperature", *thermal.CPUTempC, float64(th.CPUTempC), "°C")
+			}
+		}
+	}
 
 	return &models.HostMetric{
 		ID:           fmt.Sprintf("hm-%s", uuid.New().String()[:8]),

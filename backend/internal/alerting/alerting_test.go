@@ -128,3 +128,101 @@ func TestAlertDispatcher_SSLWarning(t *testing.T) {
 		t.Fatalf("Expected SSL warning timestamp to be recorded for key %s", key)
 	}
 }
+
+func TestAlertDispatcher_DispatchTest(t *testing.T) {
+	mockResponse := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewBufferString(`{"ok":true}`)),
+	}
+
+	dispatcher := NewAlertDispatcher(nil, &config.Config{})
+	dispatcher.httpClient.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return mockResponse, nil
+	})
+
+	// Discord valid
+	err := dispatcher.DispatchTest(context.Background(), "DISCORD", "https://discord.com/api/webhooks/123", "", "")
+	if err != nil {
+		t.Errorf("Expected Discord DispatchTest to succeed, got %v", err)
+	}
+
+	// Discord empty URL
+	err = dispatcher.DispatchTest(context.Background(), "DISCORD", "", "", "")
+	if err == nil {
+		t.Errorf("Expected error for empty Discord webhook URL")
+	}
+
+	// Telegram valid
+	err = dispatcher.DispatchTest(context.Background(), "TELEGRAM", "", "bot-token", "chat-id")
+	if err != nil {
+		t.Errorf("Expected Telegram DispatchTest to succeed, got %v", err)
+	}
+
+	// Telegram missing token
+	err = dispatcher.DispatchTest(context.Background(), "TELEGRAM", "", "", "chat-id")
+	if err == nil {
+		t.Errorf("Expected error for missing Telegram bot token")
+	}
+
+	// Unsupported type
+	err = dispatcher.DispatchTest(context.Background(), "SLACK", "", "", "")
+	if err == nil {
+		t.Errorf("Expected error for unsupported type SLACK")
+	}
+}
+
+func TestAlertDispatcher_DispatchHostThreshold(t *testing.T) {
+	dispatcher := NewAlertDispatcher(nil, &config.Config{})
+
+	// Warning threshold
+	dispatcher.DispatchHostThreshold(context.Background(), "CPU Usage", 88.5, 85.0, "%")
+	key := "threshold:host:CPU Usage"
+
+	dispatcher.mu.Lock()
+	t1, exists := dispatcher.lastAlert[key]
+	dispatcher.mu.Unlock()
+
+	if !exists {
+		t.Fatalf("Expected threshold alert to be recorded for %s", key)
+	}
+
+	// Throttled attempt immediately after
+	dispatcher.DispatchHostThreshold(context.Background(), "CPU Usage", 92.0, 85.0, "%")
+	dispatcher.mu.Lock()
+	t2 := dispatcher.lastAlert[key]
+	dispatcher.mu.Unlock()
+
+	if !t1.Equal(t2) {
+		t.Errorf("Expected threshold alert to be throttled within cooldown window")
+	}
+}
+
+func TestAlertDispatcher_DispatchLatencyThreshold(t *testing.T) {
+	dispatcher := NewAlertDispatcher(nil, &config.Config{})
+	m := &models.Monitor{
+		ID:   "mon-latency",
+		Name: "Database Cluster",
+		URL:  "tcp://db.internal:5432",
+	}
+
+	dispatcher.DispatchLatencyThreshold(context.Background(), m, 1250, 1000)
+	key := "threshold:latency:mon-latency"
+
+	dispatcher.mu.Lock()
+	t1, exists := dispatcher.lastAlert[key]
+	dispatcher.mu.Unlock()
+
+	if !exists {
+		t.Fatalf("Expected latency threshold alert to be recorded for %s", key)
+	}
+
+	dispatcher.DispatchLatencyThreshold(context.Background(), m, 1300, 1000)
+	dispatcher.mu.Lock()
+	t2 := dispatcher.lastAlert[key]
+	dispatcher.mu.Unlock()
+
+	if !t1.Equal(t2) {
+		t.Errorf("Expected latency threshold alert to be throttled")
+	}
+}

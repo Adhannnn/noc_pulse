@@ -115,6 +115,15 @@ func (p *ProberEngine) ProbeSingle(ctx context.Context, m *models.Monitor) {
 		if m.SSLCert != nil && (m.SSLCert.WarningTrigger || m.SSLCert.IsExpired) {
 			p.alertDispatcher.DispatchSSLWarning(ctx, m, m.SSLCert)
 		}
+
+		// Latency Anomaly: Check if response time exceeds configured threshold
+		if hb.Status == models.MonitorStatusUp && p.store != nil {
+			if th, err := p.store.GetAlertThresholds(ctx); err == nil && th.IsEnabled && th.LatencyMs > 0 {
+				if hb.LatencyMs >= th.LatencyMs {
+					p.alertDispatcher.DispatchLatencyThreshold(ctx, m, hb.LatencyMs, th.LatencyMs)
+				}
+			}
+		}
 	}
 
 	m.CurrentStatus = hb.Status

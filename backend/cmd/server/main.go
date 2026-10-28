@@ -65,6 +65,7 @@ func main() {
 
 	// 5. Automated Alert Dispatcher & Network Prober Engine
 	alertDispatcher := alerting.NewAlertDispatcher(store, cfg)
+	hwCollector.SetAlertDispatcher(alertDispatcher)
 	var proberEng *prober.ProberEngine
 	if store != nil {
 		proberEng = prober.NewProberEngine(store, wsHub, alertDispatcher)
@@ -104,7 +105,7 @@ func main() {
 	monitorsHandler := api.NewMonitorsHandler(store, proberEng)
 	databasesHandler := api.NewDatabasesHandler(store)
 	dockerHandler := api.NewDockerHandler(dockerSvc)
-	miscHandler := api.NewMiscHandler(store)
+	miscHandler := api.NewMiscHandler(store, alertDispatcher)
 	publicHandler := api.NewPublicHandler(store)
 
 	// WebSocket endpoint
@@ -166,11 +167,14 @@ func main() {
 		protected.Get("/api/docker/containers", dockerHandler.ListContainers)
 		protected.HandleFunc("/api/docker/containers/{id}/logs", dockerHandler.StreamLogs)
 
-		// Alert Channels
+		// Alert Channels & Custom Anomaly Thresholds
 		protected.Get("/api/alerts/channels", miscHandler.GetAllAlertChannels)
 		protected.Post("/api/alerts/channels", miscHandler.CreateAlertChannel)
 		protected.Delete("/api/alerts/channels/{id}", miscHandler.DeleteAlertChannel)
 		protected.Post("/api/alerts/channels/{id}/test", miscHandler.TestAlertChannel)
+		protected.Post("/api/alerts/test-direct", miscHandler.TestDirectAlert)
+		protected.Get("/api/alerts/thresholds", miscHandler.GetAlertThresholds)
+		protected.Put("/api/alerts/thresholds", miscHandler.UpdateAlertThresholds)
 	})
 
 	server := &http.Server{
