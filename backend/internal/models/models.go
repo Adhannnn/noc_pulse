@@ -164,6 +164,16 @@ type AlertChannel struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
+type AlertThresholds struct {
+	CPUPercent   int  `json:"cpuPercent"`
+	RAMPercent   int  `json:"ramPercent"`
+	DiskPercent  int  `json:"diskPercent"`
+	CPUTempC     int  `json:"cpuTempC"`
+	LatencyMs    int  `json:"latencyMs"`
+	CooldownMins int  `json:"cooldownMins"`
+	IsEnabled    bool `json:"isEnabled"`
+}
+
 type IPAddress struct {
 	ID         string    `json:"id"`
 	IP         string    `json:"ip"`

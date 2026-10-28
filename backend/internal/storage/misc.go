@@ -105,3 +105,57 @@ func (s *PostgresStore) DeleteAlertChannel(ctx context.Context, id string) error
 	_, err := s.pool.Exec(ctx, `DELETE FROM alert_channels WHERE id = $1`, id)
 	return err
 }
+
+func (s *PostgresStore) GetAlertChannelByID(ctx context.Context, id string) (*models.AlertChannel, error) {
+	row := s.pool.QueryRow(ctx, `
+		SELECT id, name, type, "webhookUrl", "chatId", "botToken", "isEnabled", "createdAt", "updatedAt"
+		FROM alert_channels WHERE id = $1
+	`, id)
+
+	var ac models.AlertChannel
+	if err := row.Scan(&ac.ID, &ac.Name, &ac.Type, &ac.WebhookURL, &ac.ChatID, &ac.BotToken, &ac.IsEnabled, &ac.CreatedAt, &ac.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &ac, nil
+}
+
+// Alert Thresholds
+func (s *PostgresStore) GetAlertThresholds(ctx context.Context) (*models.AlertThresholds, error) {
+	row := s.pool.QueryRow(ctx, `
+		SELECT "cpuPercent", "ramPercent", "diskPercent", "cpuTempC", "latencyMs", "cooldownMins", "isEnabled"
+		FROM alert_thresholds WHERE id = 'default'
+	`)
+
+	var t models.AlertThresholds
+	err := row.Scan(&t.CPUPercent, &t.RAMPercent, &t.DiskPercent, &t.CPUTempC, &t.LatencyMs, &t.CooldownMins, &t.IsEnabled)
+	if err != nil {
+		// Default fallback
+		return &models.AlertThresholds{
+			CPUPercent:   85,
+			RAMPercent:   90,
+			DiskPercent:  90,
+			CPUTempC:     80,
+			LatencyMs:    1000,
+			CooldownMins: 5,
+			IsEnabled:    true,
+		}, nil
+	}
+	return &t, nil
+}
+
+func (s *PostgresStore) UpdateAlertThresholds(ctx context.Context, t *models.AlertThresholds) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO alert_thresholds (id, "cpuPercent", "ramPercent", "diskPercent", "cpuTempC", "latencyMs", "cooldownMins", "isEnabled", "updatedAt")
+		VALUES ('default', $1, $2, $3, $4, $5, $6, $7, NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			"cpuPercent" = EXCLUDED."cpuPercent",
+			"ramPercent" = EXCLUDED."ramPercent",
+			"diskPercent" = EXCLUDED."diskPercent",
+			"cpuTempC" = EXCLUDED."cpuTempC",
+			"latencyMs" = EXCLUDED."latencyMs",
+			"cooldownMins" = EXCLUDED."cooldownMins",
+			"isEnabled" = EXCLUDED."isEnabled",
+			"updatedAt" = NOW()
+	`, t.CPUPercent, t.RAMPercent, t.DiskPercent, t.CPUTempC, t.LatencyMs, t.CooldownMins, t.IsEnabled)
+	return err
+}

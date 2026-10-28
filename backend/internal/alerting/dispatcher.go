@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -166,6 +167,129 @@ func (d *AlertDispatcher) DispatchSSLWarning(ctx context.Context, m *models.Moni
 		cert.Issuer,
 		cert.ValidTo.Format("2006-01-02 15:04:05 MST"),
 		statusText,
+	)
+
+	d.sendToAllChannels(ctx, title, "", color, fields, telegramMsg)
+}
+
+// DispatchTest delivers an operational test payload to verify channel connectivity
+func (d *AlertDispatcher) DispatchTest(ctx context.Context, channelType string, webhookURL, botToken, chatID string) error {
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+	title := "🧪 [PulseNOC Test] Alert Channel Connectivity Verified"
+	desc := "This is a diagnostic test message sent from your PulseNOC Operations Command Center. Telemetry dispatch pipeline is fully operational."
+	color := 0x6366F1 // Indigo NOC brand
+
+	switch strings.ToUpper(channelType) {
+	case "DISCORD":
+		if webhookURL == "" {
+			return fmt.Errorf("discord webhook URL cannot be empty")
+		}
+		fields := []DiscordEmbedField{
+			{Name: "Diagnostic Status", Value: "✅ CONNECTED & READY", Inline: true},
+			{Name: "Dispatched At", Value: nowStr, Inline: true},
+			{Name: "Target Platform", Value: "Discord Webhook", Inline: true},
+		}
+		return d.sendDiscord(ctx, webhookURL, title, desc, color, fields)
+	case "TELEGRAM":
+		if botToken == "" || chatID == "" {
+			return fmt.Errorf("telegram bot token and chat ID cannot be empty")
+		}
+		text := fmt.Sprintf(
+			"🧪 *[PulseNOC Diagnostic Test]*\n\n*Status:* `CONNECTED & READY`\n*Timestamp:* `%s`\n\nAlert channel connectivity verified successfully from your PulseNOC Command Center.",
+			nowStr,
+		)
+		return d.sendTelegram(ctx, botToken, chatID, text)
+	default:
+		return fmt.Errorf("unsupported alert channel type: %s", channelType)
+	}
+}
+
+// DispatchHostThreshold handles threshold breaches on CPU, RAM, Disk, or Temperature
+func (d *AlertDispatcher) DispatchHostThreshold(ctx context.Context, metricName string, currentVal float64, thresholdVal float64, unit string) {
+	cooldown := 5 * time.Minute
+	if d.store != nil {
+		if th, err := d.store.GetAlertThresholds(ctx); err == nil {
+			if !th.IsEnabled {
+				return
+			}
+			if th.CooldownMins > 0 {
+				cooldown = time.Duration(th.CooldownMins) * time.Minute
+			}
+		}
+	}
+
+	key := fmt.Sprintf("threshold:host:%s", metricName)
+	d.mu.Lock()
+	lastSent, exists := d.lastAlert[key]
+	if exists && time.Since(lastSent) < cooldown {
+		d.mu.Unlock()
+		return
+	}
+	d.lastAlert[key] = time.Now()
+	d.mu.Unlock()
+
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+	title := fmt.Sprintf("⚠️ [PulseNOC Alert] High Host %s Threshold Exceeded", metricName)
+	color := 0xF59E0B // Amber Warning
+	if currentVal >= thresholdVal+10 {
+		title = fmt.Sprintf("🚨 [PulseNOC CRITICAL] Host %s Critical Threshold Breach", metricName)
+		color = 0xDC2626 // Red Critical
+	}
+
+	fields := []DiscordEmbedField{
+		{Name: "Metric", Value: metricName, Inline: true},
+		{Name: "Current Value", Value: fmt.Sprintf("%.1f%s", currentVal, unit), Inline: true},
+		{Name: "Configured Threshold", Value: fmt.Sprintf("%.0f%s", thresholdVal, unit), Inline: true},
+		{Name: "Timestamp", Value: nowStr, Inline: true},
+	}
+
+	telegramMsg := fmt.Sprintf(
+		"%s\n*Metric:* %s\n*Current:* `%.1f%s` (Threshold: `%.0f%s`)\n*Timestamp:* `%s`",
+		title, metricName, currentVal, unit, thresholdVal, unit, nowStr,
+	)
+
+	d.sendToAllChannels(ctx, title, "", color, fields, telegramMsg)
+}
+
+// DispatchLatencyThreshold handles high latency warnings for external monitors
+func (d *AlertDispatcher) DispatchLatencyThreshold(ctx context.Context, m *models.Monitor, latencyMs int, thresholdMs int) {
+	cooldown := 5 * time.Minute
+	if d.store != nil {
+		if th, err := d.store.GetAlertThresholds(ctx); err == nil {
+			if !th.IsEnabled {
+				return
+			}
+			if th.CooldownMins > 0 {
+				cooldown = time.Duration(th.CooldownMins) * time.Minute
+			}
+		}
+	}
+
+	key := fmt.Sprintf("threshold:latency:%s", m.ID)
+	d.mu.Lock()
+	lastSent, exists := d.lastAlert[key]
+	if exists && time.Since(lastSent) < cooldown {
+		d.mu.Unlock()
+		return
+	}
+	d.lastAlert[key] = time.Now()
+	d.mu.Unlock()
+
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+	title := fmt.Sprintf("⚠️ [PulseNOC Alert] Elevated Latency for %s", m.Name)
+	color := 0xF59E0B // Amber
+
+	fields := []DiscordEmbedField{
+		{Name: "Monitor", Value: m.Name, Inline: true},
+		{Name: "Latency", Value: fmt.Sprintf("%d ms", latencyMs), Inline: true},
+		{Name: "Threshold", Value: fmt.Sprintf("%d ms", thresholdMs), Inline: true},
+		{Name: "Target", Value: m.URL, Inline: true},
+		{Name: "Timestamp", Value: nowStr, Inline: true},
+	}
+
+	telegramMsg := fmt.Sprintf(
+		"%s\n*Target:* `%s`\n*Latency:* `%d ms` (Threshold: `%d ms`)\n*Timestamp:* `%s`",
+		title, m.URL, latencyMs, thresholdMs, nowStr,
 	)
 
 	d.sendToAllChannels(ctx, title, "", color, fields, telegramMsg)

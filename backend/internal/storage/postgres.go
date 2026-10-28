@@ -212,6 +212,20 @@ func (s *PostgresStore) autoMigrate(ctx context.Context) error {
 		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslDaysRemaining" INT;`,
 		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslIsExpired" BOOLEAN DEFAULT false;`,
 		`ALTER TABLE monitors ADD COLUMN IF NOT EXISTS "sslWarningTrigger" BOOLEAN DEFAULT false;`,
+		`CREATE TABLE IF NOT EXISTS alert_thresholds (
+			id VARCHAR(64) PRIMARY KEY,
+			"cpuPercent" INT DEFAULT 85,
+			"ramPercent" INT DEFAULT 90,
+			"diskPercent" INT DEFAULT 90,
+			"cpuTempC" INT DEFAULT 80,
+			"latencyMs" INT DEFAULT 1000,
+			"cooldownMins" INT DEFAULT 5,
+			"isEnabled" BOOLEAN DEFAULT true,
+			"updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`INSERT INTO alert_thresholds (id, "cpuPercent", "ramPercent", "diskPercent", "cpuTempC", "latencyMs", "cooldownMins", "isEnabled")
+		VALUES ('default', 85, 90, 90, 80, 1000, 5, true)
+		ON CONFLICT (id) DO NOTHING;`,
 	}
 
 	for _, q := range queries {
