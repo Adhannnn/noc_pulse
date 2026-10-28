@@ -2,6 +2,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard,
@@ -30,15 +32,16 @@ export type NOCNavSection =
   | 'USERS'
   | 'SSH';
 
-interface SidebarProps {
-  currentTab: NOCNavSection;
-  onSelectTab: (tab: NOCNavSection) => void;
+export interface SidebarProps {
+  currentTab?: NOCNavSection;
+  onSelectTab?: (tab: NOCNavSection) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
 interface NavItem {
   id: NOCNavSection;
+  href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
@@ -56,6 +59,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       {
         id: 'OVERVIEW',
+        href: '/dashboard',
         label: 'Dashboard',
         icon: LayoutDashboard,
         iconColor: 'text-sky-400',
@@ -67,30 +71,35 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       {
         id: 'SERVICES',
+        href: '/services',
         label: 'Services',
         icon: Server,
         iconColor: 'text-amber-400',
       },
       {
         id: 'DATABASES',
+        href: '/databases',
         label: 'Databases',
         icon: Database,
         iconColor: 'text-purple-400',
       },
       {
         id: 'DOCKER',
+        href: '/docker',
         label: 'Docker Logs',
         icon: Box,
         iconColor: 'text-sky-400',
       },
       {
         id: 'PROCESSES',
+        href: '/processes',
         label: 'Process Explorer',
         icon: Activity,
         iconColor: 'text-rose-400',
       },
       {
         id: 'SSH',
+        href: '/ssh',
         label: 'SSH Console',
         icon: Terminal,
         iconColor: 'text-emerald-400',
@@ -102,6 +111,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       {
         id: 'INCIDENTS',
+        href: '/incidents',
         label: 'Incidents Log',
         icon: ShieldAlert,
         iconColor: 'text-rose-400',
@@ -113,12 +123,14 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       {
         id: 'ALERTS',
+        href: '/alerts',
         label: 'Alert Channels',
         icon: Bell,
         iconColor: 'text-amber-400',
       },
       {
         id: 'USERS',
+        href: '/users',
         label: 'Users Directory',
         icon: Users,
         iconColor: 'text-purple-400',
@@ -133,8 +145,9 @@ export default function Sidebar({
   onSelectTab,
   isCollapsed: controlledCollapsed,
   onToggleCollapse,
-}: SidebarProps) {
+}: SidebarProps = {}) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   // Restore collapsed state from localStorage on client-side mount
@@ -195,12 +208,13 @@ export default function Sidebar({
         {/* Brand Header */}
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-2 py-1">
-            <div
-              className="p-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0"
+            <Link
+              href="/dashboard"
+              className="p-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0 block"
               title="PulseNOC Telemetry"
             >
               <Radio className="w-5 h-5 animate-pulse" />
-            </div>
+            </Link>
             <button
               onClick={toggleCollapse}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E2640] transition cursor-pointer"
@@ -212,8 +226,8 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="flex items-center justify-between px-2 py-1">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0">
+            <Link href="/dashboard" className="flex items-center gap-3 group">
+              <div className="p-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0 group-hover:border-indigo-400 transition">
                 <Radio className="w-5 h-5 animate-pulse" />
               </div>
               <div className="overflow-hidden">
@@ -225,7 +239,7 @@ export default function Sidebar({
                   LIVE TELEMETRY
                 </span>
               </div>
-            </div>
+            </Link>
 
             <button
               onClick={toggleCollapse}
@@ -260,12 +274,17 @@ export default function Sidebar({
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = currentTab === item.id;
+                    const isActive = currentTab
+                      ? currentTab === item.id
+                      : item.href === '/dashboard'
+                      ? pathname === '/dashboard' || pathname === '/'
+                      : pathname === item.href || pathname.startsWith(item.href + '/');
 
                     return (
-                      <button
+                      <Link
                         key={item.id}
-                        onClick={() => onSelectTab(item.id)}
+                        href={item.href}
+                        onClick={() => onSelectTab?.(item.id)}
                         className={`w-full flex items-center ${
                           isCollapsed
                             ? 'justify-center p-2.5'
@@ -292,7 +311,7 @@ export default function Sidebar({
                             )}
                           </div>
                         )}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
