@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user && !isPublicRoute) {
         router.push('/login');
       } else if (user && pathname === '/login') {
-        router.push('/');
+        router.push('/dashboard');
       }
     }
   }, [user, loading, pathname, router]);
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('pulsenoc_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
-    router.push('/');
+    router.push('/dashboard');
   };
 
   const logout = () => {
